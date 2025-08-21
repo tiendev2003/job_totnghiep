@@ -1,0 +1,121 @@
+const mongoose = require('mongoose');
+
+const paymentSchema = new mongoose.Schema({
+  recruiter_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Recruiter',
+    required: true
+  },
+  subscription_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RecruiterSubscription',
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: [true, 'Please add payment amount'],
+    min: [0, 'Amount cannot be negative']
+  },
+  currency: {
+    type: String,
+    enum: ['VND', 'USD', 'EUR'],
+    default: 'VND',
+    required: true
+  },
+  payment_method: {
+    type: String,
+    enum: ['credit_card', 'debit_card', 'bank_transfer', 'paypal', 'momo', 'zalopay', 'vnpay'],
+    required: [true, 'Please specify payment method']
+  },
+  payment_status: {
+    type: String,
+    enum: ['pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'],
+    default: 'pending'
+  },
+  transaction_id: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  gateway_response: {
+    gateway: {
+      type: String,
+      trim: true
+    },
+    transaction_ref: {
+      type: String,
+      trim: true
+    },
+    response_code: {
+      type: String,
+      trim: true
+    },
+    response_message: {
+      type: String,
+      trim: true
+    },
+    raw_response: {
+      type: mongoose.Schema.Types.Mixed
+    }
+  },
+  payment_details: {
+    card_last_four: {
+      type: String,
+      match: [/^\d{4}$/, 'Card last four must be 4 digits']
+    },
+    card_brand: {
+      type: String,
+      enum: ['visa', 'mastercard', 'amex', 'discover', 'jcb']
+    },
+    bank_name: {
+      type: String,
+      trim: true
+    }
+  },
+  processed_at: {
+    type: Date,
+    default: null
+  },
+  failed_reason: {
+    type: String,
+    maxlength: [500, 'Failed reason cannot be more than 500 characters']
+  },
+  refund_amount: {
+    type: Number,
+    min: [0, 'Refund amount cannot be negative'],
+    default: 0
+  },
+  refunded_at: {
+    type: Date,
+    default: null
+  }
+}, {
+  timestamps: { 
+    createdAt: 'created_at', 
+    updatedAt: 'updated_at' 
+  }
+});
+
+// Index for payment queries
+paymentSchema.index({ recruiter_id: 1, created_at: -1 });
+paymentSchema.index({ payment_status: 1 });
+paymentSchema.index({ transaction_id: 1 });
+paymentSchema.index({ processed_at: -1 });
+
+// Populate recruiter data
+paymentSchema.pre(/^find/, function(next) {
+  this.populate({
+    path: 'recruiter_id',
+    select: 'company_name user_id',
+    populate: {
+      path: 'user_id',
+      select: 'full_name email'
+    }
+  }).populate({
+    path: 'subscription_id',
+    select: 'plan_type start_date end_date'
+  });
+  next();
+});
+
+module.exports = mongoose.model('Payment', paymentSchema);
