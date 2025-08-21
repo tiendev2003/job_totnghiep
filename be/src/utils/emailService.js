@@ -2,13 +2,13 @@ const nodemailer = require('nodemailer');
 
 // Tạo transporter cho gửi email
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
     secure: false, // true for 465, false for other ports
     auth: {
-      user: process.env.SMTP_EMAIL,
-      pass: process.env.SMTP_PASSWORD
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
     }
   });
 };
@@ -55,7 +55,7 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
     }
 
     const mailOptions = {
-      from: `"Hệ thống Việc Làm IT" <${process.env.SMTP_EMAIL}>`,
+      from: `"Hệ thống Việc Làm IT" <${process.env.SMTP_USER}>`,
       to: email,
       subject: subject,
       html: htmlContent
@@ -70,6 +70,29 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
   }
 };
 
+// Gửi email với template tùy chỉnh
+const sendEmail = async (options) => {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${process.env.FROM_NAME}" <${process.env.SMTP_USER}>`,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw new Error('Gửi email thất bại');
+  }
+};
+
 module.exports = {
-  sendOTPEmail
+  sendOTPEmail,
+  sendEmail
 };

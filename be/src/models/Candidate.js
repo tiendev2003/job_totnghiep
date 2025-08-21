@@ -93,6 +93,14 @@ const candidateSchema = new mongoose.Schema({
     type: String,
     enum: ['seeking', 'employed', 'not_seeking'],
     default: 'seeking'
+  },
+  saved_jobs: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Job'
+  }],
+  cv_file_url: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: { 

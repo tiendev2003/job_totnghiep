@@ -1,34 +1,45 @@
 const Interview = require('../models/Interview');
+const Recruiter = require('../models/Recruiter');
+const Candidate = require('../models/Candidate');
+const { getPaginationParams, buildPaginationResponse, applyPagination } = require('../utils/pagination');
 
 // @desc    Get all interviews
 // @route   GET /api/v1/interviews
 // @access  Private
 exports.getInterviews = async (req, res, next) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req);
     let query = {};
     
     // Filter by user role
     if (req.user.role === 'candidate') {
-      const candidate = await require('../models/Candidate').findOne({ user_id: req.user.id });
+      const candidate = await Candidate.findOne({ user_id: req.user.id });
       if (candidate) {
         query.candidate_id = candidate._id;
       }
     } else if (req.user.role === 'recruiter') {
-      const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+      const recruiter = await Recruiter.findOne({ user_id: req.user.id });
       if (recruiter) {
         query.recruiter_id = recruiter._id;
       }
     }
     
-    const interviews = await Interview.find(query)
+    // Additional filters
+    if (req.query.status) {
+      query.interview_status = req.query.status;
+    }
+    
+    const interviewsQuery = Interview.find(query)
+      .populate('candidate_id', 'full_name email phone')
+      .populate('job_id', 'title')
+      .populate('application_id', 'application_status')
       .populate('feedback')
       .sort('interview_date');
     
-    res.status(200).json({
-      success: true,
-      count: interviews.length,
-      data: interviews
-    });
+    const interviews = await applyPagination(interviewsQuery, page, limit, skip);
+    const total = await Interview.countDocuments(query);
+    
+    res.status(200).json(buildPaginationResponse(interviews, total, page, limit));
   } catch (error) {
     next(error);
   }
@@ -40,6 +51,10 @@ exports.getInterviews = async (req, res, next) => {
 exports.getInterview = async (req, res, next) => {
   try {
     const interview = await Interview.findById(req.params.id)
+      .populate('candidate_id', 'full_name email phone')
+      .populate('job_id', 'title')
+      .populate('application_id', 'application_status')
+      .populate('recruiter_id', 'company_name')
       .populate('feedback');
     
     if (!interview) {
@@ -47,6 +62,25 @@ exports.getInterview = async (req, res, next) => {
         success: false,
         message: 'Interview not found'
       });
+    }
+    
+    // Check if user has access to this interview
+    if (req.user.role === 'candidate') {
+      const candidate = await Candidate.findOne({ user_id: req.user.id });
+      if (interview.candidate_id._id.toString() !== candidate._id.toString()) {
+        return res.status(401).json({
+          success: false,
+          message: 'Not authorized to view this interview'
+        });
+      }
+    } else if (req.user.role === 'recruiter') {
+      const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+      if (interview.recruiter_id._id.toString() !== recruiter._id.toString()) {
+        return res.status(401).json({
+          success: false,
+          message: 'Not authorized to view this interview'
+        });
+      }
     }
     
     res.status(200).json({
@@ -64,7 +98,7 @@ exports.getInterview = async (req, res, next) => {
 exports.createInterview = async (req, res, next) => {
   try {
     // Get recruiter
-    const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
     if (!recruiter) {
       return res.status(400).json({
@@ -76,6 +110,11 @@ exports.createInterview = async (req, res, next) => {
     req.body.recruiter_id = recruiter._id;
     
     const interview = await Interview.create(req.body);
+    
+    // Populate the created interview
+    await interview.populate('candidate_id', 'full_name email');
+    await interview.populate('job_id', 'title');
+    await interview.populate('application_id', 'application_status');
     
     res.status(201).json({
       success: true,
@@ -101,7 +140,7 @@ exports.updateInterview = async (req, res, next) => {
     }
     
     // Get recruiter
-    const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
     // Make sure user is interview owner
     if (interview.recruiter_id.toString() !== recruiter._id.toString() && req.user.role !== 'admin') {
@@ -114,7 +153,10 @@ exports.updateInterview = async (req, res, next) => {
     interview = await Interview.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true
-    });
+    })
+    .populate('candidate_id', 'full_name email')
+    .populate('job_id', 'title')
+    .populate('application_id', 'application_status');
     
     res.status(200).json({
       success: true,
@@ -140,7 +182,7 @@ exports.deleteInterview = async (req, res, next) => {
     }
     
     // Get recruiter
-    const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
     // Make sure user is interview owner
     if (interview.recruiter_id.toString() !== recruiter._id.toString() && req.user.role !== 'admin') {

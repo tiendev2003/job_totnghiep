@@ -5,9 +5,11 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const http = require('http');
 
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
+const { initializeSocketIO } = require('./utils/socket');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -26,8 +28,14 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const servicePlanRoutes = require('./routes/servicePlanRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = initializeSocketIO(server);
 
 // Connect to MongoDB
 connectDB();
@@ -82,6 +90,8 @@ app.use(`/api/${process.env.API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${process.env.API_VERSION}/ai`, aiRoutes);
 app.use(`/api/${process.env.API_VERSION}/admin`, adminRoutes);
 app.use(`/api/${process.env.API_VERSION}/upload`, uploadRoutes);
+app.use(`/api/${process.env.API_VERSION}/service-plans`, servicePlanRoutes);
+app.use(`/api/${process.env.API_VERSION}/subscriptions`, subscriptionRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -115,8 +125,9 @@ app.get(/(.*)/, (req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`Socket.IO server initialized for real-time communication`);
 });
 
 // Handle unhandled promise rejections

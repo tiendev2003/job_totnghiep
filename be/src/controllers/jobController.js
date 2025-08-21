@@ -1,56 +1,54 @@
 const Job = require('../models/Job');
+const Recruiter = require('../models/Recruiter');
+const { getPaginationParams, buildPaginationResponse, applyPagination, getSearchParams } = require('../utils/pagination');
 
 // @desc    Get all jobs
 // @route   GET /api/v1/jobs
 // @access  Public
 exports.getJobs = async (req, res, next) => {
   try {
-    // Build query
-    let query = Job.find({ is_active: true });
+    const { page, limit, skip } = getPaginationParams(req);
+    const searchFilters = getSearchParams(req);
     
-    // Filtering
-    if (req.query.location) {
-      query = query.find({ 'location.city': new RegExp(req.query.location, 'i') });
+    // Base query for active jobs
+    const query = { is_active: true, status: 'approved', ...searchFilters };
+    
+    // Additional filters
+    if (req.query.category) {
+      query.category_id = req.query.category;
     }
     
     if (req.query.job_type) {
-      query = query.find({ job_type: req.query.job_type });
+      query.job_type = req.query.job_type;
     }
     
     if (req.query.work_location) {
-      query = query.find({ work_location: req.query.work_location });
+      query.work_location = req.query.work_location;
     }
     
-    // Salary range
     if (req.query.salary_min) {
-      query = query.find({ salary_min: { $gte: req.query.salary_min } });
+      query.salary_min = { $gte: parseInt(req.query.salary_min) };
     }
     
     if (req.query.salary_max) {
-      query = query.find({ salary_max: { $lte: req.query.salary_max } });
+      query.salary_max = { $lte: parseInt(req.query.salary_max) };
     }
     
-    // Pagination
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const startIndex = (page - 1) * limit;
+    // Location filter
+    if (req.query.location) {
+      query['location.city'] = { $regex: req.query.location, $options: 'i' };
+    }
     
-    query = query.skip(startIndex).limit(limit).sort('-created_at');
+    const jobsQuery = Job.find(query)
+      .populate('category_id', 'name')
+      .populate('recruiter_id', 'company_name company_logo_url industry')
+      .select('-applications -interviews')
+      .sort('-created_at');
     
-    const jobs = await query;
-    const total = await Job.countDocuments({ is_active: true });
+    const jobs = await applyPagination(jobsQuery, page, limit, skip);
+    const total = await Job.countDocuments(query);
     
-    res.status(200).json({
-      success: true,
-      count: jobs.length,
-      total,
-      pagination: {
-        page,
-        limit,
-        pages: Math.ceil(total / limit)
-      },
-      data: jobs
-    });
+    res.status(200).json(buildPaginationResponse(jobs, total, page, limit));
   } catch (error) {
     next(error);
   }
@@ -61,13 +59,32 @@ exports.getJobs = async (req, res, next) => {
 // @access  Public
 exports.getJob = async (req, res, next) => {
   try {
-    const job = await Job.findById(req.params.id).populate('applications');
+    const job = await Job.findById(req.params.id)
+      .populate('category_id', 'name')
+      .populate('recruiter_id', 'company_name company_description company_logo_url industry website company_size')
+      .populate({
+        path: 'applications',
+        select: 'candidate_id application_status created_at',
+        populate: {
+          path: 'candidate_id',
+          select: 'full_name'
+        }
+      });
     
     if (!job) {
       return res.status(404).json({
         success: false,
         message: 'Job not found'
       });
+    }
+    
+    // Only show applications to job owner or admin
+    if (req.user && (req.user.role === 'admin' || 
+        (req.user.role === 'recruiter' && job.recruiter_id.user_id.toString() === req.user.id))) {
+      // Keep applications
+    } else {
+      // Hide applications from public view
+      job.applications = undefined;
     }
     
     // Increment view count
@@ -88,7 +105,7 @@ exports.getJob = async (req, res, next) => {
 exports.createJob = async (req, res, next) => {
   try {
     // Add recruiter ID from authenticated user
-    const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
     if (!recruiter) {
       return res.status(400).json({
@@ -98,12 +115,18 @@ exports.createJob = async (req, res, next) => {
     }
     
     req.body.recruiter_id = recruiter._id;
+    req.body.status = 'pending'; // Default status for new jobs
     
     const job = await Job.create(req.body);
     
+    // Populate the job with recruiter info
+    await job.populate('category_id', 'name');
+    await job.populate('recruiter_id', 'company_name');
+    
     res.status(201).json({
       success: true,
-      data: job
+      data: job,
+      subscriptionInfo: req.jobStats // Added from middleware
     });
   } catch (error) {
     next(error);
@@ -125,7 +148,7 @@ exports.updateJob = async (req, res, next) => {
     }
     
     // Get recruiter
-    const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
     // Make sure user is job owner
     if (job.recruiter_id.toString() !== recruiter._id.toString() && req.user.role !== 'admin') {
@@ -138,7 +161,9 @@ exports.updateJob = async (req, res, next) => {
     job = await Job.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true
-    });
+    })
+    .populate('category_id', 'name')
+    .populate('recruiter_id', 'company_name');
     
     res.status(200).json({
       success: true,
@@ -164,7 +189,7 @@ exports.deleteJob = async (req, res, next) => {
     }
     
     // Get recruiter
-    const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
     // Make sure user is job owner
     if (job.recruiter_id.toString() !== recruiter._id.toString() && req.user.role !== 'admin') {

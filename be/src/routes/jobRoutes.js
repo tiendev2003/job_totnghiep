@@ -8,13 +8,14 @@ const {
 } = require('../controllers/jobController');
 
 const { protect, authorize, optionalAuth } = require('../middleware/auth');
+const { checkJobPostingLimit } = require('../middleware/subscription');
 
 const router = express.Router();
 
 router
   .route('/')
   .get(optionalAuth, getJobs)
-  .post(protect, authorize('recruiter', 'admin'), createJob);
+  .post(protect, authorize('recruiter', 'admin'), checkJobPostingLimit, createJob);
 
 router
   .route('/:id')

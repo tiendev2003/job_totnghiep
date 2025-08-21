@@ -1,10 +1,12 @@
 const Application = require('../models/Application');
+const { getPaginationParams, buildPaginationResponse, applyPagination } = require('../utils/pagination');
 
 // @desc    Get all applications
 // @route   GET /api/v1/applications
 // @access  Private
 exports.getApplications = async (req, res, next) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req);
     let query = {};
     
     // Filter by user role
@@ -21,13 +23,19 @@ exports.getApplications = async (req, res, next) => {
       }
     }
     
-    const applications = await Application.find(query).sort('-applied_at');
+    // Additional filters
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
     
-    res.status(200).json({
-      success: true,
-      count: applications.length,
-      data: applications
-    });
+    const applicationsQuery = Application.find(query)
+      .populate('job_id', 'title company_name')
+      .populate('candidate_id', 'full_name email');
+    
+    const applications = await applyPagination(applicationsQuery, page, limit, skip);
+    const total = await Application.countDocuments(query);
+    
+    res.status(200).json(buildPaginationResponse(applications, total, page, limit));
   } catch (error) {
     next(error);
   }

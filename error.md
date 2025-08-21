@@ -1,0 +1,4 @@
+(node:33208) [MONGOOSE] Warning: Duplicate schema index on {"interview_id":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33208) [MONGOOSE] Warning: Duplicate schema index on {"transaction_id":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:33208) [MONGOOSE] Warning: Duplicate schema index on {"template_name":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.

@@ -8,7 +8,7 @@ const userActivitySchema = new mongoose.Schema({
   },
   activity_type: {
     type: String,
-    enum: ['login', 'logout', 'job_view', 'job_apply', 'profile_update', 'search', 'message_sent', 'interview_scheduled'],
+    enum: ['login', 'logout', 'job_view', 'job_apply', 'profile_update', 'search', 'message_sent', 'interview_scheduled', 'admin_action'],
     required: [true, 'Please specify activity type']
   },
   entity_type: {
@@ -23,6 +23,11 @@ const userActivitySchema = new mongoose.Schema({
   activity_data: {
     type: mongoose.Schema.Types.Mixed,
     default: {}
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Description cannot be more than 500 characters']
   },
   ip_address: {
     type: String,

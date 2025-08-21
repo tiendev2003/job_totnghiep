@@ -1,22 +1,29 @@
 const Message = require('../models/Message');
+const { getPaginationParams, buildPaginationResponse, applyPagination } = require('../utils/pagination');
+const { sendNotificationToUser } = require('../utils/socket');
 
 // @desc    Get all messages for user
 // @route   GET /api/v1/messages
 // @access  Private
 exports.getMessages = async (req, res, next) => {
   try {
-    const messages = await Message.find({
+    const { page, limit, skip } = getPaginationParams(req);
+    
+    const query = {
       $or: [
         { sender_id: req.user.id },
         { receiver_id: req.user.id }
       ]
-    }).sort('-sent_at');
+    };
     
-    res.status(200).json({
-      success: true,
-      count: messages.length,
-      data: messages
-    });
+    const messagesQuery = Message.find(query)
+      .populate('sender_id', 'full_name email')
+      .populate('receiver_id', 'full_name email');
+    
+    const messages = await applyPagination(messagesQuery, page, limit, skip);
+    const total = await Message.countDocuments(query);
+    
+    res.status(200).json(buildPaginationResponse(messages, total, page, limit));
   } catch (error) {
     next(error);
   }
@@ -105,6 +112,21 @@ exports.sendMessage = async (req, res, next) => {
     req.body.sender_id = req.user.id;
     
     const message = await Message.create(req.body);
+    
+    // Populate the message
+    await message.populate('sender_id', 'full_name email avatar_url role');
+    await message.populate('receiver_id', 'full_name email avatar_url role');
+    
+    // Send real-time notification
+    sendNotificationToUser(req.body.receiver_id, {
+      type: 'new_message',
+      messageId: message._id,
+      senderId: req.user.id,
+      senderName: req.user.full_name,
+      subject: message.subject,
+      content: message.content.substring(0, 100) + '...',
+      timestamp: message.sent_at
+    });
     
     res.status(201).json({
       success: true,

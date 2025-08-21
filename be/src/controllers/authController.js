@@ -452,7 +452,7 @@ exports.resendOTP = async (req, res, next) => {
       verification_type: type,
       verification_code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: req.ip,
+      ip_address: "192.168.1.1",
       user_agent: req.get('User-Agent')
     });
 
@@ -564,9 +564,12 @@ const sendTokenResponse = (user, statusCode, res, message = 'Thành công') => {
   // Create token
   const token = user.getSignedJwtToken();
   
+  // Default to 7 days if JWT_COOKIE_EXPIRE is not set
+  const cookieExpireDays = process.env.JWT_COOKIE_EXPIRE || 7;
+  
   const options = {
     expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
+      Date.now() + cookieExpireDays * 24 * 60 * 60 * 1000
     ),
     httpOnly: true
   };

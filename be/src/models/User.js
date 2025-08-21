@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -52,12 +53,71 @@ const userSchema = new mongoose.Schema({
   is_active: {
     type: Boolean,
     default: false
+  },
+  account_status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'suspended'],
+    default: 'pending'
+  },
+  status_reason: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Status reason cannot be more than 500 characters']
+  },
+  status_updated_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  status_updated_at: {
+    type: Date,
+    default: null
+  },
+  last_login: {
+    type: Date,
+    default: null
+  },
+  first_name: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'First name cannot be more than 50 characters']
+  },
+  last_name: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'Last name cannot be more than 50 characters']
+  },
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpire: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: { 
     createdAt: 'created_at', 
     updatedAt: 'updated_at' 
-  }
+  },
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Virtual populate for candidate profile
+userSchema.virtual('candidate_profile', {
+  ref: 'Candidate',
+  localField: '_id',
+  foreignField: 'user_id',
+  justOne: true
+});
+
+// Virtual populate for recruiter profile
+userSchema.virtual('recruiter_profile', {
+  ref: 'Recruiter',
+  localField: '_id',
+  foreignField: 'user_id',
+  justOne: true
 });
 
 // Encrypt password using bcrypt

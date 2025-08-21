@@ -11,6 +11,7 @@ const CandidateSkill = require('./CandidateSkill');
 // Recruiter Models
 const Recruiter = require('./Recruiter');
 const RecruiterSubscription = require('./RecruiterSubscription');
+const ServicePlan = require('./ServicePlan');
 
 // Job Models
 const Job = require('./Job');
@@ -59,6 +60,7 @@ module.exports = {
   // Recruiter
   Recruiter,
   RecruiterSubscription,
+  ServicePlan,
   
   // Job
   Job,

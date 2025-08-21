@@ -117,6 +117,34 @@ const jobSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'suspended', 'expired'],
+    default: 'pending'
+  },
+  admin_notes: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Admin notes cannot be more than 500 characters']
+  },
+  reviewed_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  reviewed_at: {
+    type: Date,
+    default: null
+  },
+  company_name: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Company name cannot be more than 100 characters']
+  },
+  category_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'JobCategory'
+  },
   is_featured: {
     type: Boolean,
     default: false
