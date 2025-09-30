@@ -1,4 +1,5 @@
 const UserActivity = require('../models/UserActivity');
+const { getClientIP } = require('../utils/adminUtils');
 
 // Middleware to track user activities
 const trackActivity = (activityType, entityType = null) => {
@@ -24,7 +25,7 @@ const trackActivity = (activityType, entityType = null) => {
                 query: req.query,
                 params: req.params
               },
-              ip_address: req.ip,
+              ip_address: getClientIP(req),
               user_agent: req.get('User-Agent')
             };
 
@@ -84,7 +85,7 @@ const logAdminAction = (action) => {
                 target_id: req.params.id,
                 request_body: req.body
               },
-              ip_address: req.ip,
+              ip_address: getClientIP(req),
               user_agent: req.get('User-Agent')
             });
           } catch (error) {

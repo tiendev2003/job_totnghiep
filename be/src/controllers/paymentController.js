@@ -1,4 +1,5 @@
 const Payment = require('../models/Payment');
+const Recruiter = require('../models/Recruiter');
 
 // @desc    Get all payments
 // @route   GET /api/v1/payments
@@ -9,18 +10,23 @@ exports.getPayments = async (req, res, next) => {
     
     // Filter by recruiter if not admin
     if (req.user.role === 'recruiter') {
-      const recruiter = await require('../models/Recruiter').findOne({ user_id: req.user.id });
+      const recruiter = await Recruiter.findOne({ user_id: req.user.id });
       if (recruiter) {
         query.recruiter_id = recruiter._id;
       }
     }
+    console.log(query);
     
     // Filter by status if provided
     if (req.query.payment_status) {
       query.payment_status = req.query.payment_status;
     }
     
-    const payments = await Payment.find(query).sort('-created_at');
+    const payments = await Payment.find(query).
+    populate('recruiter_id').
+    
+    sort('-created_at');
+    console.log(payments);
     
     res.status(200).json({
       success: true,

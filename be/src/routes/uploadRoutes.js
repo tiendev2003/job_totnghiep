@@ -1,29 +1,31 @@
 const express = require('express');
 const { protect } = require('../middleware/auth');
+const { upload, handleMulterError } = require('../middleware/upload');
+const {
+  uploadFile,
+  getUserFiles,
+  getFile,
+  deleteFile,
+  downloadFile
+} = require('../controllers/uploadController');
 
 const router = express.Router();
 
 router.use(protect); // All routes below require authentication
 
 // Upload file endpoint
-router.post('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'File upload endpoint',
-    data: {
-      url: '/uploads/sample-file.pdf',
-      filename: 'sample-file.pdf'
-    }
-  });
-});
+router.post('/', upload.single('file'), handleMulterError, uploadFile);
 
-// Get uploaded files
-router.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'User uploaded files',
-    data: []
-  });
-});
+// Get user's uploaded files
+router.get('/', getUserFiles);
+
+// Get file details
+router.get('/:id', getFile);
+
+// Download file
+router.get('/:id/download', downloadFile);
+
+// Delete file
+router.delete('/:id', deleteFile);
 
 module.exports = router;

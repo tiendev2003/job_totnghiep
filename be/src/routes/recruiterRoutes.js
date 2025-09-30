@@ -13,6 +13,9 @@ const {
   getRecruiterDashboard,
   getRecruiterNotifications,
   getRecruiterSubscriptions,
+  getCurrentSubscription,
+  upgradeSubscription,
+  cancelSubscription,
   getRecruiterAnalytics
 } = require('../controllers/recruiterController');
 
@@ -32,6 +35,9 @@ router.get('/interviews', protect, authorize('recruiter'), getRecruiterInterview
 router.get('/dashboard', protect, authorize('recruiter'), getRecruiterDashboard);
 router.get('/notifications', protect, authorize('recruiter'), getRecruiterNotifications);
 router.get('/subscriptions', protect, authorize('recruiter'), getRecruiterSubscriptions);
+router.get('/subscription/current', protect, authorize('recruiter'), getCurrentSubscription);
+router.put('/subscription/upgrade', protect, authorize('recruiter'), upgradeSubscription);
+router.put('/subscription/cancel', protect, authorize('recruiter'), cancelSubscription);
 router.get('/analytics', protect, authorize('recruiter'), getRecruiterAnalytics);
 
 // Candidate search routes (Premium features)

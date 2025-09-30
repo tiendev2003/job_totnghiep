@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useDispatch, useSelector } from 'react-redux';
-import { loginUser } from '@/store/slices/authSlice';
+import { Link, useNavigate, useLocation } from 'react-router';
+import { useDispatch } from 'react-redux';
+import { loginUser, getCurrentUser } from '@/store/slices/authSlice';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-toastify';
 
 const Login = () => {
@@ -13,7 +14,11 @@ const Login = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isLoading, error } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const { isLoading, error } = useAuth();
+
+  // Get the original URL from location state
+  const from = location.state?.from?.pathname || null;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -32,16 +37,25 @@ const Login = () => {
         password: formData.password,
       })).unwrap();
       
+      // Lấy thông tin chi tiết người dùng sau khi login thành công
+      await dispatch(getCurrentUser()).unwrap();
+      
       toast.success('Đăng nhập thành công!');
       
-      // Redirect based on user role
+      // If there's a saved location, redirect there
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
+      
+      // Otherwise, redirect based on user role
       const redirectPaths = {
         admin: '/admin/dashboard',
         recruiter: '/recruiter/dashboard',
         candidate: '/candidate/dashboard',
       };
       
-      navigate(redirectPaths[result.user.role] || '/');
+      navigate(redirectPaths[result.data.role] || '/');
     } catch (error) {
       toast.error(error || 'Đăng nhập thất bại');
     }

@@ -1,51 +1,39 @@
 const express = require('express');
-const ServicePlan = require('../models/ServicePlan');
+const {
+  getServicePlans,
+  getServicePlan,
+  createServicePlan,
+  updateServicePlan,
+  deleteServicePlan,
+  subscribeToServicePlan,
+  getAvailablePlans
+} = require('../controllers/servicePlanController');
+
+const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// @desc    Get all active service plans (public)
-// @route   GET /api/service-plans
-// @access  Public
-router.get('/', async (req, res, next) => {
-  try {
-    const plans = await ServicePlan.find({ is_active: true })
-      .sort({ sort_order: 1, price: 1 })
-      .select('-created_at -updated_at');
-    
-    res.status(200).json({
-      success: true,
-      count: plans.length,
-      data: plans
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// Public routes
+router.get('/available', getAvailablePlans);
+router.get('/:id', getServicePlan);
 
-// @desc    Get single service plan (public)
-// @route   GET /api/service-plans/:id
-// @access  Public
-router.get('/:id', async (req, res, next) => {
-  try {
-    const plan = await ServicePlan.findOne({ 
-      _id: req.params.id, 
-      is_active: true 
-    }).select('-created_at -updated_at');
-    
-    if (!plan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service plan not found'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: plan
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// Protected routes
+router.use(protect);
+
+// Subscription routes
+router.post('/:id/subscribe', authorize('recruiter'), subscribeToServicePlan);
+
+// Admin only routes
+router.use(authorize('admin'));
+
+router
+  .route('/')
+  .get(getServicePlans)
+  .post(createServicePlan);
+
+router
+  .route('/:id')
+  .put(updateServicePlan)
+  .delete(deleteServicePlan);
 
 module.exports = router;

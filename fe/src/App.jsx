@@ -2,14 +2,17 @@ import { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { store } from '@/store';
 import AppRouter from '@/router';
-import { verifyToken } from '@/store/slices/authSlice';
+import { getCurrentUser, setInitialized } from '@/store/slices/authSlice';
 
 function App() {
   useEffect(() => {
-    // Verify token on app start
+    // Get current user on app start if token exists
     const token = localStorage.getItem('token');
     if (token) {
-      store.dispatch(verifyToken());
+      store.dispatch(getCurrentUser());
+    } else {
+      // No token, mark as initialized
+      store.dispatch(setInitialized());
     }
   }, []);
 

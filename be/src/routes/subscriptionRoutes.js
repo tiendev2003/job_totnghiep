@@ -3,6 +3,7 @@ const { protect, authorize } = require('../middleware/auth');
 const RecruiterSubscription = require('../models/RecruiterSubscription');
 const ServicePlan = require('../models/ServicePlan');
 const Recruiter = require('../models/Recruiter');
+const Payment = require('../models/Payment');
 
 const router = express.Router();
 
@@ -24,7 +25,9 @@ router.get('/', authorize('recruiter'), async (req, res, next) => {
 
     const subscriptions = await RecruiterSubscription.find({ 
       recruiter_id: recruiter._id 
-    }).sort({ created_at: -1 });
+    })
+    .populate('service_plan_id')
+    .sort({ created_at: -1 });
     
     res.status(200).json({
       success: true,
@@ -52,9 +55,11 @@ router.get('/current', authorize('recruiter'), async (req, res, next) => {
 
     const currentSubscription = await RecruiterSubscription.findOne({ 
       recruiter_id: recruiter._id,
-      payment_status: 'paid',
+      subscription_status: 'active',
       end_date: { $gt: new Date() }
-    }).sort({ end_date: -1 });
+    })
+    .populate('service_plan_id')
+    .sort({ end_date: -1 });
     
     res.status(200).json({
       success: true,
@@ -79,7 +84,7 @@ router.post('/', authorize('recruiter'), async (req, res, next) => {
       });
     }
 
-    const { plan_id } = req.body;
+    const { plan_id, payment_method } = req.body;
     
     // Get service plan details
     const servicePlan = await ServicePlan.findById(plan_id);
@@ -91,26 +96,68 @@ router.post('/', authorize('recruiter'), async (req, res, next) => {
       });
     }
 
+    // Check for existing active subscription
+    const existingSubscription = await RecruiterSubscription.findOne({
+      recruiter_id: recruiter._id,
+      subscription_status: 'active'
+    });
+    
+    if (existingSubscription) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have an active subscription'
+      });
+    }
+
     // Calculate end date
     const startDate = new Date();
-    const endDate = new Date(startDate.getTime() + servicePlan.duration_days * 24 * 60 * 60 * 1000);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + servicePlan.duration_days);
 
     const subscriptionData = {
       recruiter_id: recruiter._id,
-      plan_type: servicePlan.plan_type,
+      service_plan_id: servicePlan._id,
       start_date: startDate,
       end_date: endDate,
+      subscription_status: 'pending',
+      features_used: {
+        job_posts_used: 0,
+        featured_jobs_used: 0,
+        cv_downloads_used: 0
+      },
+      // Backward compatibility
+      plan_type: servicePlan.plan_type || 'basic',
       price: servicePlan.price,
-      features: servicePlan.features,
-      payment_status: 'pending'
+      payment_status: 'pending',
+      features: servicePlan.features
     };
 
     const subscription = await RecruiterSubscription.create(subscriptionData);
     
+    // Create corresponding payment record
+    const paymentData = {
+      recruiter_id: recruiter._id,
+      subscription_id: subscription._id,
+      amount: servicePlan.price,
+      currency: 'VND',
+      payment_method: payment_method,
+      payment_status: 'pending'
+    };
+    
+    const payment = await Payment.create(paymentData);
+    
+    // Update subscription with payment_id
+    subscription.payment_id = payment._id;
+    await subscription.save();
+    
+    // Populate the service plan data for response
+    const populatedSubscription = await RecruiterSubscription.findById(subscription._id)
+      .populate('service_plan_id');
+    
     res.status(201).json({
       success: true,
-      message: 'Subscription created successfully',
-      data: subscription
+      message: 'Subscription created successfully. Please complete payment to activate.',
+      data: populatedSubscription
     });
   } catch (error) {
     next(error);

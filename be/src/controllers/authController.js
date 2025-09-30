@@ -4,6 +4,7 @@ const Recruiter = require('../models/Recruiter');
 const UserVerification = require('../models/UserVerification');
 const { sendOTPEmail } = require('../utils/emailService');
 const { generateSecureOTP, isValidOTP, createExpiryTime } = require('../utils/otpService');
+const { getClientIP } = require('../utils/adminUtils');
 
 // @desc    Register user
 // @route   POST /api/v1/auth/register
@@ -71,7 +72,7 @@ exports.register = async (req, res, next) => {
       verification_type: 'email_verification',
       verification_code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       user_agent: req.get('User-Agent')
     });
 
@@ -281,7 +282,7 @@ exports.forgotPassword = async (req, res, next) => {
       verification_type: 'password_reset',
       verification_code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: req.ip,
+      ip_address: getClientIP(req),
       user_agent: req.get('User-Agent')
     });
 
@@ -452,7 +453,7 @@ exports.resendOTP = async (req, res, next) => {
       verification_type: type,
       verification_code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: "192.168.1.1",
+      ip_address: getClientIP(req),
       user_agent: req.get('User-Agent')
     });
 

@@ -357,10 +357,18 @@ const backupCollections = async (collections = []) => {
 
   return backupInfo;
 };
-
+const getClientIP = (req) => {
+  return req.ip || 
+         req.connection?.remoteAddress || 
+         req.socket?.remoteAddress || 
+         req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+         req.headers['x-real-ip'] ||
+         '127.0.0.1';
+};
 module.exports = {
   generateSystemReport,
   sendBulkEmails,
   cleanupOldData,
-  backupCollections
+  backupCollections,
+  getClientIP
 };

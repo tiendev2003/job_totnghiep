@@ -14,6 +14,18 @@ const RecruiterSubscription = require('../models/RecruiterSubscription');
 const { generateSystemReport, sendBulkEmails, cleanupOldData, backupCollections } = require('../utils/adminUtils');
 const { getPaginationParams, buildPaginationResponse, applyPagination, getSearchParams, getDateRangeFilter } = require('../utils/pagination');
 
+// Helper function to get client IP address safely
+const getClientIP = (req) => {
+  return req.ip || 
+         req.connection?.remoteAddress || 
+         req.socket?.remoteAddress || 
+         req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+         req.headers['x-real-ip'] ||
+         '127.0.0.1';
+};
+
+ 
+
 // @desc    Get admin dashboard statistics
 // @route   GET /api/admin/dashboard
 // @access  Private/Admin
@@ -43,21 +55,71 @@ exports.getDashboardStats = async (req, res, next) => {
       pendingApplications
     ] = stats;
 
-    // Get recent activities
+    // Get recent activities with better formatting
     const recentActivities = await UserActivity.find()
-      .populate('user_id', 'email role')
+      .populate('user_id', 'email role first_name last_name full_name')
       .sort('-created_at')
-      .limit(10);
+      .limit(10)
+      .lean(); // Use lean for better performance
+
+    // Format activities for better display
+    const formattedActivities = recentActivities.map(activity => ({
+      id: activity._id,
+      user_id: {
+        _id: activity.user_id?._id,
+        email: activity.user_id?.email,
+        role: activity.user_id?.role,
+        name: activity.user_id?.full_name || 
+              `${activity.user_id?.first_name || ''} ${activity.user_id?.last_name || ''}`.trim() ||
+              activity.user_id?.email
+      },
+      activity_type: activity.activity_type,
+      description: activity.description || `Thực hiện hành động: ${activity.activity_type}`,
+      created_at: activity.created_at,
+      ip_address: activity.ip_address
+    }));
 
     // Get monthly stats for charts
     const currentDate = new Date();
     const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
     
-    const monthlyStats = await Promise.all([
+    const [currentMonthUsers, lastMonthUsers, currentMonthJobs, lastMonthJobs, currentMonthApplications, lastMonthApplications] = await Promise.all([
       User.countDocuments({ created_at: { $gte: lastMonth } }),
+      User.countDocuments({ created_at: { $gte: previousMonth, $lt: lastMonth } }),
       Job.countDocuments({ created_at: { $gte: lastMonth } }),
-      Application.countDocuments({ created_at: { $gte: lastMonth } })
+      Job.countDocuments({ created_at: { $gte: previousMonth, $lt: lastMonth } }),
+      Application.countDocuments({ created_at: { $gte: lastMonth } }),
+      Application.countDocuments({ created_at: { $gte: previousMonth, $lt: lastMonth } })
     ]);
+
+    // Calculate growth percentages
+    const userGrowthPercent = lastMonthUsers > 0 ? ((currentMonthUsers - lastMonthUsers) / lastMonthUsers) * 100 : currentMonthUsers > 0 ? 100 : 0;
+    const jobGrowthPercent = lastMonthJobs > 0 ? ((currentMonthJobs - lastMonthJobs) / lastMonthJobs) * 100 : currentMonthJobs > 0 ? 100 : 0;
+    const applicationGrowthPercent = lastMonthApplications > 0 ? ((currentMonthApplications - lastMonthApplications) / lastMonthApplications) * 100 : currentMonthApplications > 0 ? 100 : 0;
+
+    // Get total revenue
+    const revenueResult = await Payment.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const totalRevenue = revenueResult[0]?.total || 0;
+
+    // Calculate revenue growth (comparing current month vs last month)
+    const [currentMonthRevenue, lastMonthRevenue] = await Promise.all([
+      Payment.aggregate([
+        { $match: { status: 'completed', created_at: { $gte: lastMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Payment.aggregate([
+        { $match: { status: 'completed', created_at: { $gte: previousMonth, $lt: lastMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
+    ]);
+
+    const currentRevenue = currentMonthRevenue[0]?.total || 0;
+    const previousRevenue = lastMonthRevenue[0]?.total || 0;
+    const revenueGrowthPercent = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : currentRevenue > 0 ? 100 : 0;
 
     res.status(200).json({
       success: true,
@@ -74,12 +136,438 @@ exports.getDashboardStats = async (req, res, next) => {
           pendingApplications
         },
         monthly: {
-          newUsers: monthlyStats[0],
-          newJobs: monthlyStats[1],
-          newApplications: monthlyStats[2]
+          newUsers: currentMonthUsers,
+          newJobs: currentMonthJobs,
+          newApplications: currentMonthApplications
         },
-        recentActivities
+        growth: {
+          userGrowthPercent: userGrowthPercent.toFixed(1),
+          jobGrowthPercent: jobGrowthPercent.toFixed(1),
+          applicationGrowthPercent: applicationGrowthPercent.toFixed(1),
+          revenueGrowthPercent: revenueGrowthPercent.toFixed(1)
+        },
+        totalRevenue: Math.round(totalRevenue / 1000000), // Convert to millions
+        recentActivities: formattedActivities
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get user growth data for analytics
+// @route   GET /api/admin/analytics/user-growth
+// @access  Private/Admin
+exports.getUserGrowthData = async (req, res, next) => {
+  try {
+    const { timeRange = '7days' } = req.query;
+    
+    // Parse time range
+    const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : timeRange === '90days' ? 90 : 365;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    // Get user growth data
+    const userGrowthData = await User.aggregate([
+      {
+        $match: {
+          created_at: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+            role: "$role"
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.date": 1 }
+      }
+    ]);
+
+    // Format data for chart
+    const labels = [];
+    const candidatesData = [];
+    const recruitersData = [];
+    
+    // Generate date labels
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      labels.push(date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }));
+    }
+    
+    // Initialize data arrays
+    labels.forEach(() => {
+      candidatesData.push(0);
+      recruitersData.push(0);
+    });
+    
+    // Fill actual data
+    userGrowthData.forEach(item => {
+      const dateIndex = labels.indexOf(new Date(item._id.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }));
+      if (dateIndex !== -1) {
+        if (item._id.role === 'candidate') {
+          candidatesData[dateIndex] = item.count;
+        } else if (item._id.role === 'recruiter') {
+          recruitersData[dateIndex] = item.count;
+        }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        labels,
+        candidates: candidatesData,
+        recruiters: recruitersData
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get job statistics for analytics
+// @route   GET /api/admin/analytics/job-stats
+// @access  Private/Admin
+exports.getJobStatistics = async (req, res, next) => {
+  try {
+    const { timeRange = '7days' } = req.query;
+    
+    const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : timeRange === '90days' ? 90 : 365;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    // Get job statistics by category
+    const jobStats = await Job.aggregate([
+      {
+        $match: {
+          created_at: { $gte: startDate }
+        }
+      },
+      {
+        $lookup: {
+          from: 'jobcategories',
+          localField: 'job_category_id',
+          foreignField: '_id',
+          as: 'category'
+        }
+      },
+      {
+        $group: {
+          _id: { $arrayElemAt: ['$category.name', 0] },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 10
+      }
+    ]);
+
+    const labels = jobStats.map(item => item._id || 'Khác');
+    const values = jobStats.map(item => item.count);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        labels,
+        values
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get application statistics for analytics
+// @route   GET /api/admin/analytics/application-stats
+// @access  Private/Admin
+exports.getApplicationStatistics = async (req, res, next) => {
+  try {
+    const { timeRange = '7days' } = req.query;
+    
+    const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : timeRange === '90days' ? 90 : 365;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    const applicationStats = await Application.aggregate([
+      {
+        $match: {
+          created_at: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+            status: "$status"
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.date": 1 }
+      }
+    ]);
+
+    // Format data for chart
+    const labels = [];
+    const applicationsData = [];
+    const acceptedData = [];
+    
+    // Generate date labels
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      labels.push(date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }));
+    }
+    
+    // Initialize data arrays
+    labels.forEach(() => {
+      applicationsData.push(0);
+      acceptedData.push(0);
+    });
+    
+    // Fill actual data
+    applicationStats.forEach(item => {
+      const dateIndex = labels.indexOf(new Date(item._id.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }));
+      if (dateIndex !== -1) {
+        if (item._id.status === 'pending' || item._id.status === 'under_review') {
+          applicationsData[dateIndex] += item.count;
+        } else if (item._id.status === 'accepted') {
+          acceptedData[dateIndex] += item.count;
+        }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        labels,
+        applications: applicationsData,
+        accepted: acceptedData
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get revenue statistics for analytics  
+// @route   GET /api/admin/analytics/revenue-stats
+// @access  Private/Admin
+exports.getRevenueStatistics = async (req, res, next) => {
+  try {
+    const { timeRange = '7days' } = req.query;
+    
+    const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : timeRange === '90days' ? 90 : 365;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    const revenueStats = await Payment.aggregate([
+      {
+        $match: {
+          created_at: { $gte: startDate },
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+          revenue: { $sum: "$amount" }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
+
+    // Format data for chart
+    const labels = [];
+    const values = [];
+    
+    // Generate date labels
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
+      labels.push(date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }));
+      
+      const dayRevenue = revenueStats.find(item => item._id === dateString);
+      values.push(dayRevenue ? Math.round(dayRevenue.revenue / 1000000) : 0); // Convert to millions
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        labels,
+        values
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get system status for maintenance
+// @route   GET /api/admin/maintenance/status
+// @access  Private/Admin
+exports.getSystemStatus = async (req, res, next) => {
+  try {
+    // Check various system components
+    const [userCount, jobCount, applicationCount] = await Promise.all([
+      User.countDocuments(),
+      Job.countDocuments(),
+      Application.countDocuments()
+    ]);
+
+    // Mock system health checks (in real app, you'd check actual services)
+    const systemStatus = {
+      overall: 'healthy',
+      database: 'healthy', 
+      storage: userCount > 1000 ? 'warning' : 'healthy',
+      email: 'healthy',
+      payment: 'healthy',
+      ai: jobCount > 100 ? 'healthy' : 'warning'
+    };
+
+    const systemStats = {
+      uptime: '15 ngày 6 giờ', // Mock data
+      totalUsers: userCount,
+      activeJobs: jobCount,
+      storageUsed: '78%', // Mock data
+      memoryUsage: '65%', // Mock data
+      cpuUsage: '42%' // Mock data
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        systemStatus,
+        systemStats,
+        maintenanceMode: false // You'd check actual maintenance mode status
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get maintenance tasks
+// @route   GET /api/admin/maintenance/tasks
+// @access  Private/Admin
+exports.getMaintenanceTasks = async (req, res, next) => {
+  try {
+    // Mock maintenance tasks (in real app, you'd fetch from database)
+    const maintenanceTasks = [
+      {
+        id: 1,
+        name: 'Dọn dẹp log files',
+        status: 'completed',
+        lastRun: '2024-01-15 02:00',
+        nextRun: '2024-01-16 02:00'
+      },
+      {
+        id: 2,
+        name: 'Backup database',
+        status: 'running',
+        lastRun: '2024-01-16 01:00',
+        nextRun: '2024-01-17 01:00'
+      },
+      {
+        id: 3,
+        name: 'Optimize database',
+        status: 'pending',
+        lastRun: '2024-01-10 03:00',
+        nextRun: '2024-01-17 03:00'
+      },
+      {
+        id: 4,
+        name: 'Clean temporary files',
+        status: 'scheduled',
+        lastRun: '2024-01-15 04:00',
+        nextRun: '2024-01-16 04:00'
+      }
+    ];
+
+    res.status(200).json({
+      success: true,
+      data: maintenanceTasks
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Run maintenance task
+// @route   POST /api/admin/maintenance/tasks/:id/run
+// @access  Private/Admin
+exports.runMaintenanceTask = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Mock running a maintenance task
+    // In real app, you'd execute the actual task
+    
+    res.status(200).json({
+      success: true,
+      message: `Maintenance task ${id} started successfully`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Enable maintenance mode
+// @route   POST /api/admin/maintenance/mode/enable
+// @access  Private/Admin
+exports.enableMaintenanceMode = async (req, res, next) => {
+  try {
+    // In real app, you'd set maintenance mode flag in database or config
+    res.status(200).json({
+      success: true,
+      message: 'Maintenance mode enabled'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Export analytics report
+// @route   POST /api/admin/analytics/export
+// @access  Private/Admin
+exports.exportAnalyticsReport = async (req, res, next) => {
+  try {
+    const { timeRange, format } = req.body;
+    
+    // In real app, you'd generate actual report file
+    // For now, just return success message
+    res.status(200).json({
+      success: true,
+      message: 'Analytics report export initiated',
+      downloadUrl: `/downloads/analytics-report-${timeRange}.${format}`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Disable maintenance mode
+// @route   POST /api/admin/maintenance/mode/disable
+// @access  Private/Admin
+exports.disableMaintenanceMode = async (req, res, next) => {
+  try {
+    // In real app, you'd remove maintenance mode flag
+    res.status(200).json({
+      success: true,
+      message: 'Maintenance mode disabled'
     });
   } catch (error) {
     next(error);
@@ -94,6 +582,8 @@ exports.getUsers = async (req, res, next) => {
     const { page, limit, skip } = getPaginationParams(req);
     const searchFilters = getSearchParams(req);
     const { role, status } = req.query;
+
+    console.log('Search Filters:', searchFilters);
     
     const query = { ...searchFilters };
 
@@ -104,7 +594,7 @@ exports.getUsers = async (req, res, next) => {
 
     // Filter by status
     if (status) {
-      query.is_active = status === 'active';
+      query.is_active = status == 'active';
     }
 
     const usersQuery = User.find(query)
@@ -175,6 +665,7 @@ exports.sendBulkEmails = async (req, res, next) => {
       data: result
     });
   } catch (error) {
+    console.error('Bulk email error:', error);
     next(error);
   }
 };
@@ -305,7 +796,7 @@ exports.getSystemHealth = async (req, res, next) => {
 exports.updateUserStatus = async (req, res, next) => {
   try {
     const { status, reason } = req.body; // status: 'approved', 'rejected', 'suspended'
-    
+    console.log('Updating user status:', req.ip);
     const user = await User.findById(req.params.id);
     
     if (!user) {
@@ -324,13 +815,26 @@ exports.updateUserStatus = async (req, res, next) => {
 
     await user.save();
 
-    // Log activity
+    // Log activity with better description
+    const actionDescriptions = {
+      'approved': 'Phê duyệt tài khoản',
+      'rejected': 'Từ chối tài khoản', 
+      'suspended': 'Tạm khóa tài khoản'
+    };
+    
     await UserActivity.create({
       user_id: req.user.id,
       activity_type: 'admin_action',
-      description: `${status} user account: ${user.email}`,
-      ip_address: req.ip,
-      user_agent: req.get('User-Agent')
+      entity_type: 'User',
+      entity_id: user._id,
+      description: `${actionDescriptions[status] || 'Cập nhật trạng thái'} tài khoản: ${user.email}`,
+      ip_address: getClientIP(req),
+      user_agent: req.get('User-Agent') || 'Unknown',
+      activity_data: {
+        target_user: user.email,
+        action: status,
+        reason: reason
+      }
     });
 
     // Send notification to user
@@ -338,8 +842,10 @@ exports.updateUserStatus = async (req, res, next) => {
       user_id: user._id,
       title: `Account ${status}`,
       message: reason ? `Your account has been ${status}. Reason: ${reason}` : `Your account has been ${status}.`,
-      type: 'account_status',
-      created_by: req.user.id
+      notification_type: 'system_announcement',
+      related_entity_type: 'User',
+      related_entity_id: user._id,
+      priority: 'high'
     });
 
     res.status(200).json({
@@ -409,8 +915,10 @@ exports.updateJobStatus = async (req, res, next) => {
       user_id: job.recruiter_id.user_id,
       title: `Job Posting ${status}`,
       message: `Your job posting "${job.title}" has been ${status}.${reason ? ` Reason: ${reason}` : ''}`,
-      type: 'job_status',
-      created_by: req.user.id
+      notification_type: 'system_announcement',
+      related_entity_type: 'Job',
+      related_entity_id: job._id,
+      priority: 'medium'
     });
 
     res.status(200).json({
@@ -639,7 +1147,7 @@ exports.deleteEmailTemplate = async (req, res, next) => {
 // @access  Private/Admin
 exports.broadcastNotification = async (req, res, next) => {
   try {
-    const { title, message, type, target_role } = req.body;
+    const { title, message, notification_type, target_role, priority } = req.body;
     
     // Get target users
     const query = target_role ? { role: target_role } : {};
@@ -650,8 +1158,8 @@ exports.broadcastNotification = async (req, res, next) => {
       user_id: user._id,
       title,
       message,
-      type: type || 'system',
-      created_by: req.user.id
+      notification_type: notification_type || 'system_announcement',
+      priority: priority || 'medium'
     }));
 
     await Notification.insertMany(notifications);
@@ -1065,8 +1573,10 @@ exports.updateSubscriptionStatus = async (req, res, next) => {
       user_id: subscription.recruiter_id.user_id,
       title: `Subscription ${payment_status}`,
       message: `Your ${subscription.plan_type} subscription status has been updated to ${payment_status}.`,
-      type: 'subscription_status',
-      created_by: req.user.id
+      notification_type: 'payment_reminder',
+      related_entity_type: 'Payment',
+      related_entity_id: subscription._id,
+      priority: 'medium'
     });
 
     res.status(200).json({
@@ -1151,6 +1661,313 @@ exports.getSubscriptionStats = async (req, res, next) => {
         revenue: revenueStats[0] || { totalRevenue: 0, averagePrice: 0 },
         planTypes: planTypeStats
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get system settings
+// @route   GET /api/admin/settings
+// @access  Private/Admin
+exports.getSettings = async (req, res, next) => {
+  try {
+    // Mock settings data - in real app, this would come from database
+    const settings = {
+      general: {
+        siteName: 'IT Jobs Platform',
+        siteDescription: 'Nền tảng tuyển dụng IT hàng đầu Việt Nam',
+        contactEmail: 'contact@itjobs.vn',
+        supportEmail: 'support@itjobs.vn',
+        maxJobPostingDays: 30,
+        maxFreeJobPosts: 3,
+        enableRegistration: true,
+        enableJobPosting: true,
+        enableUserReports: true
+      },
+      email: {
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 587,
+        smtpUser: 'noreply@itjobs.vn',
+        smtpPassword: '********',
+        fromEmail: 'noreply@itjobs.vn',
+        fromName: 'IT Jobs Platform'
+      },
+      seo: {
+        metaTitle: 'IT Jobs - Việc làm IT hàng đầu',
+        metaDescription: 'Tìm kiếm và ứng tuyển các vị trí việc làm IT tốt nhất tại Việt Nam',
+        metaKeywords: 'việc làm IT, tuyển dụng IT, jobs, careers',
+        ogTitle: 'IT Jobs Platform',
+        ogDescription: 'Nền tảng tuyển dụng IT hàng đầu Việt Nam',
+        ogImage: '/og-image.jpg'
+      },
+      payment: {
+        enablePayment: true,
+        currency: 'VND',
+        paymentMethods: ['vnpay', 'momo', 'bank_transfer'],
+        taxRate: 10
+      },
+      security: {
+        passwordMinLength: 8,
+        sessionTimeout: 24,
+        maxLoginAttempts: 5,
+        enableTwoFactor: false,
+        requireEmailVerification: true,
+        enableCaptcha: true
+      },
+      notifications: {
+        emailNotifications: true,
+        browserNotifications: true,
+        smsNotifications: false,
+        notifyNewUsers: true,
+        notifyNewJobs: true,
+        notifyNewApplications: true,
+        notifyReports: true
+      }
+    };
+
+    res.status(200).json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update system settings
+// @route   PUT /api/admin/settings/:section
+// @access  Private/Admin
+exports.updateSettings = async (req, res, next) => {
+  try {
+    const { section } = req.params;
+    const settingsData = req.body;
+
+    // Validate section
+    const validSections = ['general', 'email', 'seo', 'payment', 'security', 'notifications'];
+    if (!validSections.includes(section)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid settings section'
+      });
+    }
+
+    // Mock update - in real app, this would save to database
+    console.log(`Updating ${section} settings:`, settingsData);
+
+    res.status(200).json({
+      success: true,
+      message: `${section} settings updated successfully`,
+      data: settingsData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Test email settings
+// @route   POST /api/admin/settings/test-email
+// @access  Private/Admin
+exports.testEmailSettings = async (req, res, next) => {
+  try {
+    const { smtpHost, smtpPort, smtpUser, smtpPassword, fromEmail, testRecipient } = req.body;
+
+    // Mock email test - in real app, this would actually send a test email
+    console.log('Testing email settings:', {
+      smtpHost,
+      smtpPort,
+      smtpUser,
+      fromEmail,
+      testRecipient
+    });
+
+    // Simulate test delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Simulate random success/failure for demo
+    const isSuccess = Math.random() > 0.2; // 80% success rate
+
+    if (isSuccess) {
+      res.status(200).json({
+        success: true,
+        message: 'Test email sent successfully'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Failed to send test email. Please check your settings.'
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Test payment settings
+// @route   POST /api/admin/settings/test-payment
+// @access  Private/Admin
+exports.testPaymentSettings = async (req, res, next) => {
+  try {
+    const paymentSettings = req.body;
+
+    // Mock payment test - in real app, this would test payment gateway connection
+    console.log('Testing payment settings:', paymentSettings);
+
+    // Simulate test delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Simulate random success/failure for demo
+    const isSuccess = Math.random() > 0.3; // 70% success rate
+
+    if (isSuccess) {
+      res.status(200).json({
+        success: true,
+        message: 'Payment gateway connection successful'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Failed to connect to payment gateway. Please check your configuration.'
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all notifications for admin
+// @route   GET /api/admin/notifications
+// @access  Private/Admin
+exports.getNotifications = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPaginationParams(req);
+    const { notification_type, is_read, priority } = req.query;
+    
+    const query = {};
+    if (notification_type) query.notification_type = notification_type;
+    if (is_read !== undefined) query.is_read = is_read === 'true';
+    if (priority) query.priority = priority;
+
+    const totalNotifications = await Notification.countDocuments(query);
+    const notifications = await Notification.find(query)
+      .populate('user_id', 'email first_name last_name role')
+      .sort('-created_at')
+      .skip(skip)
+      .limit(limit);
+
+    const pagination = buildPaginationResponse(page, limit, totalNotifications);
+
+    res.status(200).json({
+      success: true,
+      count: notifications.length,
+      pagination,
+      data: notifications
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create notification
+// @route   POST /api/admin/notifications
+// @access  Private/Admin
+exports.createNotification = async (req, res, next) => {
+  try {
+    // Ensure user_id is provided, if not assign to the requesting admin
+    const notificationData = {
+      ...req.body,
+      user_id: req.body.user_id || req.user.id
+    };
+
+    const notification = await Notification.create(notificationData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Notification created successfully',
+      data: notification
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update notification
+// @route   PUT /api/admin/notifications/:id
+// @access  Private/Admin
+exports.updateNotification = async (req, res, next) => {
+  try {
+    const notification = await Notification.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification updated successfully',
+      data: notification
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete notification
+// @route   DELETE /api/admin/notifications/:id
+// @access  Private/Admin
+exports.deleteNotification = async (req, res, next) => {
+  try {
+    const notification = await Notification.findByIdAndDelete(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Send notification
+// @route   POST /api/admin/notifications/:id/send
+// @access  Private/Admin
+exports.sendNotification = async (req, res, next) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    // Update notification status to sent
+    notification.status = 'sent';
+    notification.sent_at = new Date();
+    await notification.save();
+
+    // Here you would implement the actual notification sending logic
+    // For now, we'll just simulate it
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification sent successfully',
+      data: notification
     });
   } catch (error) {
     next(error);

@@ -306,12 +306,17 @@ exports.getRecruiterInterviews = async (req, res, next) => {
       ...dateFilters 
     };
     
-    if (status) query.interview_status = status;
+    if (status) query.status = status;
     
     const interviewsQuery = Interview.find(query)
-      .populate('application_id')
+      .populate({
+        path: 'application_id',
+        populate: {
+          path: 'job_id',
+          select: 'title'
+        }
+      })
       .populate('candidate_id', 'full_name email phone')
-      .populate('job_id', 'title')
       .sort('interview_date');
     
     const interviews = await applyPagination(interviewsQuery, page, limit, skip);
@@ -327,6 +332,7 @@ exports.getRecruiterInterviews = async (req, res, next) => {
 // @route   GET /api/recruiters/dashboard
 // @access  Private/Recruiter
 exports.getRecruiterDashboard = async (req, res, next) => {
+  console.log('Fetching recruiter dashboard stats...',req.user);
   try {
     const recruiter = await Recruiter.findOne({ user_id: req.user.id });
     
@@ -443,12 +449,173 @@ exports.getRecruiterSubscriptions = async (req, res, next) => {
     
     const subscriptions = await RecruiterSubscription.find({ 
       recruiter_id: recruiter._id 
-    }).sort('-created_at');
+    })
+    .populate('service_plan_id')
+    .sort('-created_at');
     
+    console.log(subscriptions.length); 
     res.status(200).json({
       success: true,
       count: subscriptions.length,
       data: subscriptions
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get current active subscription
+// @route   GET /api/recruiters/subscription/current
+// @access  Private/Recruiter
+exports.getCurrentSubscription = async (req, res, next) => {
+  try {
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    const currentSubscription = await RecruiterSubscription.findOne({ 
+      recruiter_id: recruiter._id,
+      subscription_status: 'active',
+      end_date: { $gt: new Date() }
+    })
+    .populate('service_plan_id')
+    .sort({ end_date: -1 });
+    
+    let usage = null;
+    if (currentSubscription && currentSubscription.service_plan_id) {
+      const plan = currentSubscription.service_plan_id;
+      usage = {
+        job_postings_used: currentSubscription.features_used?.job_posts_used || 0,
+        job_postings_limit: plan.features?.job_posts_limit || 0,
+        cv_download_used: currentSubscription.features_used?.cv_downloads_used || 0,
+        cv_download_limit: plan.features?.cv_downloads || 0,
+        candidate_search_used: 0, // Implement based on your tracking
+        candidate_search_limit: plan.features?.candidate_search ? -1 : 0 // -1 means unlimited
+      };
+    }
+    console.log(currentSubscription);
+    res.status(200).json({
+      success: true,
+      data: currentSubscription ? {
+        ...currentSubscription.toObject(),
+        usage
+      } : null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Upgrade subscription
+// @route   PUT /api/recruiters/subscription/upgrade
+// @access  Private/Recruiter
+exports.upgradeSubscription = async (req, res, next) => {
+  try {
+    const { planId, payment_method } = req.body;
+    
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    // Get new service plan
+    const newPlan = await ServicePlan.findById(planId);
+    
+    if (!newPlan || !newPlan.is_active) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service plan not found or inactive'
+      });
+    }
+    
+    // Get current subscription
+    const currentSubscription = await RecruiterSubscription.findOne({
+      recruiter_id: recruiter._id,
+      subscription_status: 'active'
+    });
+    
+    if (currentSubscription) {
+      // Cancel current subscription
+      currentSubscription.subscription_status = 'cancelled';
+      await currentSubscription.save();
+    }
+    
+    // Create new subscription
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + newPlan.duration_days);
+    
+    const newSubscription = await RecruiterSubscription.create({
+      recruiter_id: recruiter._id,
+      service_plan_id: newPlan._id,
+      start_date: startDate,
+      end_date: endDate,
+      subscription_status: 'pending',
+      payment_status: 'pending',
+      features_used: {
+        job_posts_used: 0,
+        featured_jobs_used: 0,
+        cv_downloads_used: 0
+      }
+    });
+    
+    const populatedSubscription = await RecruiterSubscription.findById(newSubscription._id)
+      .populate('service_plan_id');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Subscription upgraded successfully. Please complete payment to activate.',
+      data: populatedSubscription
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Cancel subscription
+// @route   PUT /api/recruiters/subscription/cancel
+// @access  Private/Recruiter
+exports.cancelSubscription = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    const currentSubscription = await RecruiterSubscription.findOne({
+      recruiter_id: recruiter._id,
+      subscription_status: 'active'
+    });
+    
+    if (!currentSubscription) {
+      return res.status(404).json({
+        success: false,
+        message: 'No active subscription found'
+      });
+    }
+    
+    currentSubscription.subscription_status = 'cancelled';
+    await currentSubscription.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Subscription cancelled successfully',
+      data: currentSubscription
     });
   } catch (error) {
     next(error);

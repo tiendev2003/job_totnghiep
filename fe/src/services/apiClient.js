@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 class ApiClient {
   constructor() {
@@ -25,11 +25,21 @@ class ApiClient {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        // Handle 401 Unauthorized - token expired or invalid
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          // Redirect to login if not already there
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;

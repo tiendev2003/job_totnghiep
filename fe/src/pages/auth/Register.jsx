@@ -6,7 +6,8 @@ import { toast } from 'react-toastify';
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
+    full_name: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -42,7 +43,8 @@ const Register = () => {
 
     try {
       await dispatch(registerUser({
-        name: formData.name,
+        username: formData.username,
+        full_name: formData.full_name,
         email: formData.email,
         password: formData.password,
         role: formData.role,
@@ -76,17 +78,33 @@ const Register = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                Tên đăng nhập
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                placeholder="Nhập tên đăng nhập"
+                value={formData.username}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
                 Họ và tên
               </label>
               <input
-                id="name"
-                name="name"
+                id="full_name"
+                name="full_name"
                 type="text"
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 placeholder="Nhập họ và tên"
-                value={formData.name}
+                value={formData.full_name}
                 onChange={handleChange}
               />
             </div>
@@ -190,8 +208,8 @@ const Register = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+              className=' w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed'
+             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (

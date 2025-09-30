@@ -33,7 +33,15 @@ const userActivitySchema = new mongoose.Schema({
     type: String,
     validate: {
       validator: function(v) {
-        return !v || /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$|^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(v);
+        if (!v) return true; // Allow empty values
+        // IPv4 pattern
+        const ipv4Pattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        // IPv6 pattern (simplified)
+        const ipv6Pattern = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$/;
+        // Special cases for localhost and development
+        const specialCases = /^(localhost|127\.0\.0\.1|::1|::ffff:.+)$/;
+        
+        return ipv4Pattern.test(v) || ipv6Pattern.test(v) || specialCases.test(v);
       },
       message: 'Please provide a valid IP address'
     }

@@ -183,9 +183,9 @@ exports.deleteInterview = async (req, res, next) => {
     
     // Get recruiter
     const recruiter = await Recruiter.findOne({ user_id: req.user.id });
-    
+    console.log('Recruiter:', recruiter._id , "---", interview.recruiter_id._id);
     // Make sure user is interview owner
-    if (interview.recruiter_id.toString() !== recruiter._id.toString() && req.user.role !== 'admin') {
+    if (interview.recruiter_id._id.toString() !== recruiter._id.toString() && req.user.role !== 'admin') {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to delete this interview'

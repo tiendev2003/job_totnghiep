@@ -7,7 +7,7 @@ export const loginUser = createAsyncThunk(
   async ({ email, password }, { rejectWithValue }) => {
     try {
       const response = await authService.login(email, password);
-      localStorage.setItem('token', response.data.token);
+       localStorage.setItem('token', response.token);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Login failed');
@@ -27,18 +27,14 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-export const verifyToken = createAsyncThunk(
-  'auth/verifyToken',
+export const getCurrentUser = createAsyncThunk(
+  'auth/getCurrentUser',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-      
-      const response = await authService.verifyToken(token);
-      return response.data;
+      const response = await authService.getCurrentUser();
+      return response;
     } catch (error) {
-      localStorage.removeItem('token');
-      return rejectWithValue(error.response?.data?.message || 'Token verification failed');
+      return rejectWithValue(error.message || 'Failed to get user info');
     }
   }
 );
@@ -48,6 +44,7 @@ const initialState = {
   token: localStorage.getItem('token'),
   isLoading: false,
   isAuthenticated: false,
+  isInitialized: false, // Track if initial auth check is complete
   error: null,
 };
 
@@ -59,11 +56,15 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      state.isInitialized = true;
       state.error = null;
       localStorage.removeItem('token');
     },
     clearError: (state) => {
       state.error = null;
+    },
+    setInitialized: (state) => {
+      state.isInitialized = true;
     },
   },
   extraReducers: (builder) => {
@@ -76,7 +77,8 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isAuthenticated = true;
-        state.user = action.payload.user;
+        state.isInitialized = true;
+        state.user = action.payload.data;
         state.token = action.payload.token;
         state.error = null;
       })
@@ -98,18 +100,26 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload;
       })
-      // Verify Token
-      .addCase(verifyToken.fulfilled, (state, action) => {
-        state.isAuthenticated = true;
-        state.user = action.payload.user;
+      // Get Current User
+      .addCase(getCurrentUser.pending, (state) => {
+        state.isLoading = true;
       })
-      .addCase(verifyToken.rejected, (state) => {
-        state.isAuthenticated = false;
+      .addCase(getCurrentUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.data.user;
+        state.isAuthenticated = true;
+        state.isInitialized = true;
+      })
+      .addCase(getCurrentUser.rejected, (state) => {
+        state.isLoading = false;
         state.user = null;
+        state.isAuthenticated = false;
+        state.isInitialized = true;
         state.token = null;
+        localStorage.removeItem('token');
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { logout, clearError, setInitialized } = authSlice.actions;
 export default authSlice.reducer;

@@ -11,11 +11,6 @@ const authService = {
     return await apiClient.post('/auth/register', userData);
   },
 
-  // Verify Token
-  verifyToken: async (token) => {
-    return await apiClient.get('/auth/verify', { token });
-  },
-
   // Logout
   logout: async () => {
     return await apiClient.post('/auth/logout');

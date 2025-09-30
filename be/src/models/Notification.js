@@ -28,7 +28,7 @@ const notificationSchema = new mongoose.Schema({
   },
   related_entity_type: {
     type: String,
-    enum: ['Job', 'Application', 'Interview', 'AIJobRecommendation', 'AICandidateRecommendation', 'Payment'],
+    enum: ['Job', 'Application', 'Interview', 'AIJobRecommendation', 'AICandidateRecommendation', 'Payment', 'User'],
     default: null
   },
   related_entity_id: {

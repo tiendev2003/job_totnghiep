@@ -16,6 +16,10 @@ const {
   deleteEmailTemplate,
   broadcastNotification,
   getSystemAnalytics,
+  getUserGrowthData,
+  getJobStatistics,
+  getApplicationStatistics,
+  getRevenueStatistics,
   exportUsers,
   generateReport,
   sendBulkEmails,
@@ -23,6 +27,11 @@ const {
   backupSystem,
   getUserActivities,
   getSystemHealth,
+  getSystemStatus,
+  getMaintenanceTasks,
+  runMaintenanceTask,
+  enableMaintenanceMode,
+  disableMaintenanceMode,
   getServicePlans,
   createServicePlan,
   updateServicePlan,
@@ -30,8 +39,29 @@ const {
   toggleServicePlanStatus,
   getSubscriptions,
   updateSubscriptionStatus,
-  getSubscriptionStats
+  getSubscriptionStats,
+  getSettings,
+  updateSettings,
+  testEmailSettings,
+  testPaymentSettings,
+  getNotifications,
+  createNotification,
+  updateNotification,
+  exportAnalyticsReport,
+  sendNotification,
+  deleteNotification
 } = require('../controllers/adminController');
+
+// Import report controller functions
+const {
+  updateReportStatus
+} = require('../controllers/reportController');
+
+// Import payment controller functions  
+const {
+  updatePaymentStatus,
+  processRefund
+} = require('../controllers/paymentController');
 
 // Import job category functions
 const {
@@ -52,6 +82,11 @@ router.use(authorize('admin')); // All routes require admin access
 // Dashboard & Analytics
 router.get('/dashboard', getDashboardStats);
 router.get('/analytics', getSystemAnalytics);
+router.get('/analytics/user-growth', getUserGrowthData);
+router.get('/analytics/job-stats', getJobStatistics);
+router.get('/analytics/application-stats', getApplicationStatistics);
+router.get('/analytics/revenue-stats', getRevenueStatistics);
+router.post('/analytics/export', logAdminAction('export_analytics'), exportAnalyticsReport);
 router.get('/health', getSystemHealth);
 
 // User Management
@@ -77,6 +112,7 @@ router.put('/job-categories/reorder', logAdminAction('reorder_categories'), reor
 
 // Report Management
 router.get('/reports', getReports);
+router.put('/reports/:id/status', logAdminAction('update_report_status'), updateReportStatus);
 router.put('/reports/:id/resolve', logAdminAction('resolve_report'), resolveReport);
 
 // System Reports
@@ -84,6 +120,8 @@ router.get('/reports/system/:type', logAdminAction('generate_system_report'), ge
 
 // Payment Management
 router.get('/payments', getPayments);
+router.put('/payments/:id/status', logAdminAction('update_payment_status'), updatePaymentStatus);
+router.put('/payments/:id/refund', logAdminAction('process_refund'), processRefund);
 
 // Service Plan Management
 router.get('/service-plans', getServicePlans);
@@ -105,19 +143,26 @@ router.delete('/email-templates/:id', logAdminAction('delete_email_template'), d
 router.post('/emails/bulk', logAdminAction('send_bulk_emails'), sendBulkEmails);
 
 // Notification Management
+router.get('/notifications', getNotifications);
+router.post('/notifications', logAdminAction('create_notification'), createNotification);
+router.put('/notifications/:id', logAdminAction('update_notification'), updateNotification);
+router.delete('/notifications/:id', logAdminAction('delete_notification'), deleteNotification);
+router.post('/notifications/:id/send', logAdminAction('send_notification'), sendNotification);
 router.post('/notifications/broadcast', logAdminAction('broadcast_notification'), broadcastNotification);
 
 // Maintenance
+router.get('/maintenance/status', getSystemStatus);
+router.get('/maintenance/tasks', getMaintenanceTasks);
+router.post('/maintenance/tasks/:id/run', logAdminAction('run_maintenance_task'), runMaintenanceTask);
+router.post('/maintenance/mode/enable', logAdminAction('enable_maintenance_mode'), enableMaintenanceMode);
+router.post('/maintenance/mode/disable', logAdminAction('disable_maintenance_mode'), disableMaintenanceMode);
 router.post('/maintenance/cleanup', logAdminAction('system_cleanup'), cleanupSystem);
 router.post('/maintenance/backup', logAdminAction('system_backup'), backupSystem);
 
-// System settings (placeholder for future implementation)
-router.get('/settings', (req, res) => {
-  res.json({
-    success: true,
-    message: 'System settings',
-    data: {}
-  });
-});
+// Settings routes
+router.get('/settings', logAdminAction('get_settings'), getSettings);
+router.put('/settings/:section', logAdminAction('update_settings'), updateSettings);
+router.post('/settings/test-email', logAdminAction('test_email_settings'), testEmailSettings);
+router.post('/settings/test-payment', logAdminAction('test_payment_settings'), testPaymentSettings);
 
 module.exports = router;
