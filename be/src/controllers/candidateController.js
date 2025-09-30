@@ -1,7 +1,4 @@
 const Candidate = require('../models/Candidate');
-const CandidateExperience = require('../models/CandidateExperience');
-const CandidateEducation = require('../models/CandidateEducation');
-const CandidateSkill = require('../models/CandidateSkill');
 const Application = require('../models/Application');
 const Interview = require('../models/Interview');
 const Job = require('../models/Job');
@@ -17,9 +14,7 @@ exports.getCandidates = async (req, res, next) => {
     const searchFilters = getSearchParams(req);
     
     const candidatesQuery = Candidate.find(searchFilters)
-      .populate('user_id', 'username email full_name phone avatar_url')
-      .populate('experiences')
-      .populate('educations')
+      .populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active')
       .sort('-created_at');
     
     const candidates = await applyPagination(candidatesQuery, page, limit, skip);
@@ -37,9 +32,7 @@ exports.getCandidates = async (req, res, next) => {
 exports.getCandidate = async (req, res, next) => {
   try {
     const candidate = await Candidate.findById(req.params.id)
-      .populate('user_id', 'username email full_name phone avatar_url')
-      .populate('experiences')
-      .populate('educations')
+      .populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active')
       .populate('applications');
     
     if (!candidate) {
@@ -48,10 +41,6 @@ exports.getCandidate = async (req, res, next) => {
         message: 'Candidate not found'
       });
     }
-    
-    // Get candidate skills
-    const skills = await CandidateSkill.find({ candidate_id: candidate._id });
-    candidate.skills = skills;
     
     res.status(200).json({
       success: true,
@@ -156,9 +145,7 @@ exports.deleteCandidate = async (req, res, next) => {
 exports.getCandidateProfile = async (req, res, next) => {
   try {
     const candidate = await Candidate.findOne({ user_id: req.user.id })
-      .populate('user_id', 'username email full_name phone avatar_url is_verified is_active')
-      .populate('experiences')
-      .populate('educations');
+      .populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active');
     
     if (!candidate) {
       return res.status(404).json({
@@ -167,15 +154,9 @@ exports.getCandidateProfile = async (req, res, next) => {
       });
     }
     
-    // Get candidate skills
-    const skills = await CandidateSkill.find({ candidate_id: candidate._id });
-    
     res.status(200).json({
       success: true,
-      data: {
-        ...candidate.toObject(),
-        skills: skills
-      }
+      data: candidate
     });
   } catch (error) {
     next(error);
@@ -200,7 +181,7 @@ exports.updateCandidateProfile = async (req, res, next) => {
       });
     }
     
-    await candidate.populate('user_id', 'username email full_name phone avatar_url is_verified is_active');
+    await candidate.populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active');
     
     res.status(200).json({
       success: true,
@@ -462,9 +443,10 @@ exports.getCandidateExperiences = async (req, res, next) => {
       });
     }
     
-    const experiences = await CandidateExperience.find({ 
-      candidate_id: candidate._id 
-    }).sort('-start_date');
+    // Sort experiences by start_date (newest first)
+    const experiences = candidate.experience.sort((a, b) => 
+      new Date(b.start_date) - new Date(a.start_date)
+    );
     
     res.status(200).json({
       success: true,
@@ -489,13 +471,16 @@ exports.addCandidateExperience = async (req, res, next) => {
       });
     }
     
-    req.body.candidate_id = candidate._id;
+    // Add new experience to embedded array
+    candidate.experience.push(req.body);
+    await candidate.save();
     
-    const experience = await CandidateExperience.create(req.body);
+    // Return the newly added experience
+    const newExperience = candidate.experience[candidate.experience.length - 1];
     
     res.status(201).json({
       success: true,
-      data: experience
+      data: newExperience
     });
   } catch (error) {
     next(error);
@@ -503,7 +488,7 @@ exports.addCandidateExperience = async (req, res, next) => {
 };
 
 // @desc    Update candidate experience
-// @route   PUT /api/candidates/experiences/:id
+// @route   PUT /api/candidates/experiences/:experienceId
 // @access  Private/Candidate
 exports.updateCandidateExperience = async (req, res, next) => {
   try {
@@ -516,32 +501,25 @@ exports.updateCandidateExperience = async (req, res, next) => {
       });
     }
     
-    let experience = await CandidateExperience.findById(req.params.id);
+    // Find experience in embedded array
+    const experienceIndex = candidate.experience.findIndex(
+      exp => exp._id.toString() === req.params.experienceId
+    );
     
-    if (!experience) {
+    if (experienceIndex === -1) {
       return res.status(404).json({
         success: false,
         message: 'Experience not found'
       });
     }
     
-    // Check ownership
-    if (experience.candidate_id.toString() !== candidate._id.toString()) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to update this experience'
-      });
-    }
-    
-    experience = await CandidateExperience.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
-      { new: true, runValidators: true }
-    );
+    // Update experience
+    Object.assign(candidate.experience[experienceIndex], req.body);
+    await candidate.save();
     
     res.status(200).json({
       success: true,
-      data: experience
+      data: candidate.experience[experienceIndex]
     });
   } catch (error) {
     next(error);
@@ -549,7 +527,7 @@ exports.updateCandidateExperience = async (req, res, next) => {
 };
 
 // @desc    Delete candidate experience
-// @route   DELETE /api/candidates/experiences/:id
+// @route   DELETE /api/candidates/experiences/:experienceId
 // @access  Private/Candidate
 exports.deleteCandidateExperience = async (req, res, next) => {
   try {
@@ -562,24 +540,12 @@ exports.deleteCandidateExperience = async (req, res, next) => {
       });
     }
     
-    const experience = await CandidateExperience.findById(req.params.id);
+    // Remove experience from embedded array
+    candidate.experience = candidate.experience.filter(
+      exp => exp._id.toString() !== req.params.experienceId
+    );
     
-    if (!experience) {
-      return res.status(404).json({
-        success: false,
-        message: 'Experience not found'
-      });
-    }
-    
-    // Check ownership
-    if (experience.candidate_id.toString() !== candidate._id.toString()) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to delete this experience'
-      });
-    }
-    
-    await experience.deleteOne();
+    await candidate.save();
     
     res.status(200).json({
       success: true,
@@ -606,9 +572,10 @@ exports.getCandidateEducations = async (req, res, next) => {
       });
     }
     
-    const educations = await CandidateEducation.find({ 
-      candidate_id: candidate._id 
-    }).sort('-start_date');
+    // Sort educations by start_date (newest first)
+    const educations = candidate.education.sort((a, b) => 
+      new Date(b.start_date) - new Date(a.start_date)
+    );
     
     res.status(200).json({
       success: true,
@@ -633,13 +600,16 @@ exports.addCandidateEducation = async (req, res, next) => {
       });
     }
     
-    req.body.candidate_id = candidate._id;
+    // Add new education to embedded array
+    candidate.education.push(req.body);
+    await candidate.save();
     
-    const education = await CandidateEducation.create(req.body);
+    // Return the newly added education
+    const newEducation = candidate.education[candidate.education.length - 1];
     
     res.status(201).json({
       success: true,
-      data: education
+      data: newEducation
     });
   } catch (error) {
     next(error);
@@ -647,7 +617,7 @@ exports.addCandidateEducation = async (req, res, next) => {
 };
 
 // @desc    Update candidate education
-// @route   PUT /api/candidates/educations/:id
+// @route   PUT /api/candidates/educations/:educationId
 // @access  Private/Candidate
 exports.updateCandidateEducation = async (req, res, next) => {
   try {
@@ -660,32 +630,25 @@ exports.updateCandidateEducation = async (req, res, next) => {
       });
     }
     
-    let education = await CandidateEducation.findById(req.params.id);
+    // Find education in embedded array
+    const educationIndex = candidate.education.findIndex(
+      edu => edu._id.toString() === req.params.educationId
+    );
     
-    if (!education) {
+    if (educationIndex === -1) {
       return res.status(404).json({
         success: false,
         message: 'Education not found'
       });
     }
     
-    // Check ownership
-    if (education.candidate_id.toString() !== candidate._id.toString()) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to update this education'
-      });
-    }
-    
-    education = await CandidateEducation.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
-      { new: true, runValidators: true }
-    );
+    // Update education
+    Object.assign(candidate.education[educationIndex], req.body);
+    await candidate.save();
     
     res.status(200).json({
       success: true,
-      data: education
+      data: candidate.education[educationIndex]
     });
   } catch (error) {
     next(error);
@@ -693,7 +656,7 @@ exports.updateCandidateEducation = async (req, res, next) => {
 };
 
 // @desc    Delete candidate education
-// @route   DELETE /api/candidates/educations/:id
+// @route   DELETE /api/candidates/educations/:educationId
 // @access  Private/Candidate
 exports.deleteCandidateEducation = async (req, res, next) => {
   try {
@@ -706,24 +669,12 @@ exports.deleteCandidateEducation = async (req, res, next) => {
       });
     }
     
-    const education = await CandidateEducation.findById(req.params.id);
+    // Remove education from embedded array
+    candidate.education = candidate.education.filter(
+      edu => edu._id.toString() !== req.params.educationId
+    );
     
-    if (!education) {
-      return res.status(404).json({
-        success: false,
-        message: 'Education not found'
-      });
-    }
-    
-    // Check ownership
-    if (education.candidate_id.toString() !== candidate._id.toString()) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to delete this education'
-      });
-    }
-    
-    await education.deleteOne();
+    await candidate.save();
     
     res.status(200).json({
       success: true,
@@ -750,9 +701,10 @@ exports.getCandidateSkills = async (req, res, next) => {
       });
     }
     
-    const skills = await CandidateSkill.find({ 
-      candidate_id: candidate._id 
-    }).sort('skill_name');
+    // Sort skills by name
+    const skills = candidate.skills_detailed.sort((a, b) => 
+      a.skill_name.localeCompare(b.skill_name)
+    );
     
     res.status(200).json({
       success: true,
@@ -777,13 +729,28 @@ exports.addCandidateSkill = async (req, res, next) => {
       });
     }
     
-    req.body.candidate_id = candidate._id;
+    // Check if skill already exists
+    const existingSkill = candidate.skills_detailed.find(
+      skill => skill.skill_name.toLowerCase() === req.body.skill_name.toLowerCase()
+    );
     
-    const skill = await CandidateSkill.create(req.body);
+    if (existingSkill) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill already exists'
+      });
+    }
+    
+    // Add new skill to embedded array
+    candidate.skills_detailed.push(req.body);
+    await candidate.save();
+    
+    // Return the newly added skill
+    const newSkill = candidate.skills_detailed[candidate.skills_detailed.length - 1];
     
     res.status(201).json({
       success: true,
-      data: skill
+      data: newSkill
     });
   } catch (error) {
     next(error);
@@ -791,7 +758,7 @@ exports.addCandidateSkill = async (req, res, next) => {
 };
 
 // @desc    Update candidate skill
-// @route   PUT /api/candidates/skills/:id
+// @route   PUT /api/candidates/skills/:skillId
 // @access  Private/Candidate
 exports.updateCandidateSkill = async (req, res, next) => {
   try {
@@ -804,32 +771,39 @@ exports.updateCandidateSkill = async (req, res, next) => {
       });
     }
     
-    let skill = await CandidateSkill.findById(req.params.id);
+    // Find skill in embedded array
+    const skillIndex = candidate.skills_detailed.findIndex(
+      skill => skill._id.toString() === req.params.skillId
+    );
     
-    if (!skill) {
+    if (skillIndex === -1) {
       return res.status(404).json({
         success: false,
         message: 'Skill not found'
       });
     }
     
-    // Check ownership
-    if (skill.candidate_id.toString() !== candidate._id.toString()) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to update this skill'
-      });
+    // Check if skill name is being changed and already exists
+    if (req.body.skill_name && req.body.skill_name.toLowerCase() !== candidate.skills_detailed[skillIndex].skill_name.toLowerCase()) {
+      const existingSkill = candidate.skills_detailed.find(
+        (skill, index) => index !== skillIndex && skill.skill_name.toLowerCase() === req.body.skill_name.toLowerCase()
+      );
+      
+      if (existingSkill) {
+        return res.status(400).json({
+          success: false,
+          message: 'Skill name already exists'
+        });
+      }
     }
     
-    skill = await CandidateSkill.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
-      { new: true, runValidators: true }
-    );
+    // Update skill
+    Object.assign(candidate.skills_detailed[skillIndex], req.body);
+    await candidate.save();
     
     res.status(200).json({
       success: true,
-      data: skill
+      data: candidate.skills_detailed[skillIndex]
     });
   } catch (error) {
     next(error);
@@ -837,7 +811,7 @@ exports.updateCandidateSkill = async (req, res, next) => {
 };
 
 // @desc    Delete candidate skill
-// @route   DELETE /api/candidates/skills/:id
+// @route   DELETE /api/candidates/skills/:skillId
 // @access  Private/Candidate
 exports.deleteCandidateSkill = async (req, res, next) => {
   try {
@@ -850,24 +824,12 @@ exports.deleteCandidateSkill = async (req, res, next) => {
       });
     }
     
-    const skill = await CandidateSkill.findById(req.params.id);
+    // Remove skill from embedded array
+    candidate.skills_detailed = candidate.skills_detailed.filter(
+      skill => skill._id.toString() !== req.params.skillId
+    );
     
-    if (!skill) {
-      return res.status(404).json({
-        success: false,
-        message: 'Skill not found'
-      });
-    }
-    
-    // Check ownership
-    if (skill.candidate_id.toString() !== candidate._id.toString()) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to delete this skill'
-      });
-    }
-    
-    await skill.deleteOne();
+    await candidate.save();
     
     res.status(200).json({
       success: true,
@@ -929,7 +891,7 @@ exports.applyForJob = async (req, res, next) => {
     // Populate application data
     await application.populate([
       { path: 'job_id', select: 'title company_name' },
-      { path: 'candidate_id', select: 'full_name email' }
+      { path: 'candidate_id', select: 'bio experience_years' }
     ]);
     
     res.status(201).json({
@@ -1007,7 +969,7 @@ exports.getSavedJobs = async (req, res, next) => {
       });
     }
     
-    // Get saved job IDs (assuming we add a saved_jobs field to candidate model)
+    // Get saved job IDs
     const savedJobIds = candidate.saved_jobs || [];
     
     if (savedJobIds.length === 0) {
@@ -1019,7 +981,7 @@ exports.getSavedJobs = async (req, res, next) => {
       is_active: true 
     })
     .populate('category_id', 'name')
-    .populate('recruiter_id', 'company_name company_logo_url industry')
+    .populate('recruiter_id', 'company_name logo_url industry')
     .sort('-created_at');
     
     const jobs = await applyPagination(jobsQuery, page, limit, skip);
@@ -1108,6 +1070,82 @@ exports.unsaveJob = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Job unsaved successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update salary expectation
+// @route   PUT /api/candidates/salary-expectation
+// @access  Private/Candidate
+exports.updateSalaryExpectation = async (req, res, next) => {
+  try {
+    const { min, max, currency } = req.body;
+    
+    const candidate = await Candidate.findOne({ user_id: req.user.id });
+    
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate profile not found'
+      });
+    }
+    
+    // Validate salary range
+    if (min && max && min > max) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimum salary cannot be greater than maximum salary'
+      });
+    }
+    
+    candidate.salary_expectation = {
+      min: min || candidate.salary_expectation?.min,
+      max: max || candidate.salary_expectation?.max,
+      currency: currency || candidate.salary_expectation?.currency || 'VND'
+    };
+    
+    await candidate.save();
+    
+    res.status(200).json({
+      success: true,
+      data: candidate.salary_expectation
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update job status
+// @route   PUT /api/candidates/job-status
+// @access  Private/Candidate
+exports.updateJobStatus = async (req, res, next) => {
+  try {
+    const { job_status } = req.body;
+    
+    if (!['seeking', 'employed', 'not_seeking'].includes(job_status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid job status. Must be: seeking, employed, or not_seeking'
+      });
+    }
+    
+    const candidate = await Candidate.findOne({ user_id: req.user.id });
+    
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate profile not found'
+      });
+    }
+    
+    candidate.job_status = job_status;
+    await candidate.save();
+    
+    res.status(200).json({
+      success: true,
+      data: { job_status: candidate.job_status }
     });
   } catch (error) {
     next(error);

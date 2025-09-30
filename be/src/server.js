@@ -30,6 +30,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const servicePlanRoutes = require("./routes/servicePlanRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const contentRoutes = require("./routes/contentRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -103,6 +104,7 @@ app.use(`/api/${process.env.API_VERSION}/admin`, adminRoutes);
 app.use(`/api/${process.env.API_VERSION}/upload`, uploadRoutes);
 app.use(`/api/${process.env.API_VERSION}/service-plans`, servicePlanRoutes);
 app.use(`/api/${process.env.API_VERSION}/subscriptions`, subscriptionRoutes);
+app.use(`/api/${process.env.API_VERSION}/content`, contentRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {

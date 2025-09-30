@@ -62,6 +62,5 @@ const emailTemplateSchema = new mongoose.Schema({
 
 // Index for template queries
 emailTemplateSchema.index({ template_type: 1, is_active: 1 });
-emailTemplateSchema.index({ template_name: 1 });
 
 module.exports = mongoose.model('EmailTemplate', emailTemplateSchema);

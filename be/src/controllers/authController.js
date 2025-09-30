@@ -1,7 +1,6 @@
 const User = require('../models/User');
 const Candidate = require('../models/Candidate');
 const Recruiter = require('../models/Recruiter');
-const UserVerification = require('../models/UserVerification');
 const { sendOTPEmail } = require('../utils/emailService');
 const { generateSecureOTP, isValidOTP, createExpiryTime } = require('../utils/otpService');
 const { getClientIP } = require('../utils/adminUtils');
@@ -11,7 +10,7 @@ const { getClientIP } = require('../utils/adminUtils');
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { username, email, password, role, full_name, phone } = req.body;
+    const { first_name, last_name, email, password, role, phone } = req.body;
     
     // Kiểm tra email đã tồn tại chưa
     const existingUser = await User.findOne({ email });
@@ -21,25 +20,16 @@ exports.register = async (req, res, next) => {
         message: 'Email đã được sử dụng'
       });
     }
-
-    // Kiểm tra username đã tồn tại chưa
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username đã được sử dụng'
-      });
-    }
     
-    // Tạo user với trạng thái is_active = false
+    // Tạo user với trạng thái pending
     const user = await User.create({
-      username,
+      first_name: req.body.first_name,
+      last_name: req.body.last_name,
       email,
       password,
       role,
-      full_name,
       phone,
-      is_active: false
+      account_status: 'pending'
     });
     
     // Tạo role-specific profile
@@ -59,22 +49,13 @@ exports.register = async (req, res, next) => {
     const otp = generateSecureOTP();
     console.log(`Generated OTP for ${email}: ${otp} -- ip : ${req.ip} -- user agent: ${req.get('User-Agent')}`);
     
-    // Xóa các verification cũ chưa sử dụng
-    await UserVerification.deleteMany({
-      user_id: user._id,
-      verification_type: 'email_verification',
-      is_used: false
-    });
- 
-    // Tạo verification record mới
-    await UserVerification.create({
-      user_id: user._id,
-      verification_type: 'email_verification',
-      verification_code: otp,
+    // Cập nhật email verification trong user document
+    user.email_verification = {
+      code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: getClientIP(req),
-      user_agent: req.get('User-Agent')
-    });
+      attempts: 0
+    };
+    await user.save();
 
     // Gửi OTP qua email
     await sendOTPEmail(email, otp, 'verification');
@@ -123,33 +104,22 @@ exports.verifyOTP = async (req, res, next) => {
       });
     }
 
-    // Kiểm tra xem tài khoản đã được kích hoạt chưa
-    if (user.is_active) {
+    // Kiểm tra tài khoản đã được kích hoạt chưa
+    if (user.account_status === 'approved') {
       return res.status(400).json({
         success: false,
         message: 'Tài khoản đã được kích hoạt'
       });
     }
 
-    // Tìm verification record
-    const verification = await UserVerification.findOne({
-      user_id: user._id,
-      verification_type: 'email_verification',
-      verification_code: otp,
-      is_used: false,
-      expires_at: { $gt: new Date() }
-    });
-
-    if (!verification) {
+    // Kiểm tra verification code
+    if (!user.email_verification.code || 
+        user.email_verification.code !== otp ||
+        user.email_verification.expires_at < new Date()) {
+      
       // Tăng số lần thử
-      await UserVerification.updateOne(
-        {
-          user_id: user._id,
-          verification_type: 'email_verification',
-          is_used: false
-        },
-        { $inc: { attempts: 1 } }
-      );
+      user.email_verification.attempts = (user.email_verification.attempts || 0) + 1;
+      await user.save();
 
       return res.status(400).json({
         success: false,
@@ -158,21 +128,18 @@ exports.verifyOTP = async (req, res, next) => {
     }
 
     // Kiểm tra số lần thử
-    if (verification.attempts >= 5) {
+    if (user.email_verification.attempts >= 5) {
       return res.status(429).json({
         success: false,
         message: 'Đã vượt quá số lần thử cho phép. Vui lòng yêu cầu mã OTP mới.'
       });
     }
 
-    // Cập nhật trạng thái verification
-    verification.is_used = true;
-    verification.used_at = new Date();
-    await verification.save();
-
-    // Kích hoạt tài khoản
-    user.is_active = true;
-    user.is_verified = true;
+    // Xóa verification code và kích hoạt tài khoản
+    user.email_verification.code = null;
+    user.email_verification.expires_at = null;
+    user.email_verification.attempts = 0;
+    user.account_status = 'approved';
     await user.save();
 
     // Trả về token sau khi xác thực thành công

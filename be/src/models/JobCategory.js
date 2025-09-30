@@ -93,9 +93,7 @@ jobCategorySchema.pre('save', function(next) {
   next();
 });
 
-// Index for better performance
-jobCategorySchema.index({ category_name: 1 });
-jobCategorySchema.index({ slug: 1 });
+// Index for better performance (category_name and slug already have unique: true)
 jobCategorySchema.index({ parent_category_id: 1 });
 jobCategorySchema.index({ is_active: 1, sort_order: 1 });
 

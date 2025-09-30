@@ -62,8 +62,7 @@ const interviewFeedbackSchema = new mongoose.Schema({
   }
 });
 
-// Index for feedback queries
-interviewFeedbackSchema.index({ interview_id: 1 });
+// Index for feedback queries (interview_id already has unique: true)
 interviewFeedbackSchema.index({ interviewer_id: 1 });
 
 module.exports = mongoose.model('InterviewFeedback', interviewFeedbackSchema);

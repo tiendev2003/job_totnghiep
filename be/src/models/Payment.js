@@ -88,6 +88,38 @@ const paymentSchema = new mongoose.Schema({
   refunded_at: {
     type: Date,
     default: null
+  },
+  // Electronic invoice fields
+  invoice: {
+    invoice_number: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    invoice_date: {
+      type: Date,
+      default: null
+    },
+    invoice_url: {
+      type: String,
+      trim: true
+    },
+    tax_amount: {
+      type: Number,
+      min: [0, 'Tax amount cannot be negative'],
+      default: 0
+    },
+    tax_rate: {
+      type: Number,
+      min: [0, 'Tax rate cannot be negative'],
+      max: [100, 'Tax rate cannot exceed 100%'],
+      default: 10 // 10% VAT default for Vietnam
+    },
+    invoice_status: {
+      type: String,
+      enum: ['not_issued', 'issued', 'sent', 'cancelled'],
+      default: 'not_issued'
+    }
   }
 }, {
   timestamps: { 
@@ -99,7 +131,6 @@ const paymentSchema = new mongoose.Schema({
 // Index for payment queries
 paymentSchema.index({ recruiter_id: 1, created_at: -1 });
 paymentSchema.index({ payment_status: 1 });
-paymentSchema.index({ transaction_id: 1 });
 paymentSchema.index({ processed_at: -1 });
 
 // Populate recruiter data

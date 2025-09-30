@@ -13,6 +13,7 @@ const { getSubscriptionStatus } = require('../middleware/subscription');
 exports.getRecruiters = async (req, res, next) => {
   try {
     const recruiters = await Recruiter.find()
+      .populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active')
       .populate('jobs subscriptions')
       .sort('-created_at');
     
@@ -32,6 +33,7 @@ exports.getRecruiters = async (req, res, next) => {
 exports.getRecruiter = async (req, res, next) => {
   try {
     const recruiter = await Recruiter.findById(req.params.id)
+      .populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active')
       .populate('jobs');
     
     if (!recruiter) {
@@ -144,7 +146,7 @@ exports.deleteRecruiter = async (req, res, next) => {
 exports.getRecruiterProfile = async (req, res, next) => {
   try {
     const recruiter = await Recruiter.findOne({ user_id: req.user.id })
-      .populate('user_id', 'username email full_name phone avatar_url is_verified is_active')
+      .populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active')
       .populate('jobs')
       .populate('subscriptions');
     
@@ -181,7 +183,7 @@ exports.updateRecruiterProfile = async (req, res, next) => {
     recruiter = await Recruiter.findByIdAndUpdate(recruiter._id, req.body, {
       new: true,
       runValidators: true
-    }).populate('user_id', 'username email full_name phone avatar_url is_verified is_active');
+    }).populate('user_id', 'first_name last_name email phone avatar_url full_name is_verified is_active');
     
     res.status(200).json({
       success: true,
@@ -225,7 +227,11 @@ exports.getRecruiterJobs = async (req, res, next) => {
         select: 'candidate_id application_status created_at',
         populate: {
           path: 'candidate_id',
-          select: 'full_name email'
+          select: 'bio experience_years',
+          populate: {
+            path: 'user_id',
+            select: 'first_name last_name email phone avatar_url full_name'
+          }
         }
       });
     
@@ -264,12 +270,12 @@ exports.getRecruiterApplications = async (req, res, next) => {
     
     const applicationsQuery = Application.find(query)
       .populate('job_id', 'title')
-      .populate('candidate_id', 'full_name email phone')
+      .populate('candidate_id', 'bio experience_years')
       .populate({
         path: 'candidate_id',
         populate: {
           path: 'user_id',
-          select: 'avatar_url'
+          select: 'first_name last_name email phone avatar_url full_name'
         }
       })
       .sort('-created_at');
@@ -316,7 +322,14 @@ exports.getRecruiterInterviews = async (req, res, next) => {
           select: 'title'
         }
       })
-      .populate('candidate_id', 'full_name email phone')
+      .populate({
+        path: 'candidate_id',
+        select: 'bio experience_years',
+        populate: {
+          path: 'user_id',
+          select: 'first_name last_name email phone avatar_url full_name'
+        }
+      })
       .sort('interview_date');
     
     const interviews = await applyPagination(interviewsQuery, page, limit, skip);
@@ -375,7 +388,7 @@ exports.getRecruiterDashboard = async (req, res, next) => {
       job_id: { $in: jobIds }
     })
     .populate('job_id', 'title')
-    .populate('candidate_id', 'full_name email')
+    .populate('candidate_id', 'bio experience_years')
     .sort('-created_at')
     .limit(5);
     
@@ -710,6 +723,155 @@ exports.getRecruiterAnalytics = async (req, res, next) => {
         applicationsByStatus,
         topJobs
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update company culture and values
+// @route   PUT /api/recruiters/company-culture
+// @access  Private/Recruiter
+exports.updateCompanyCulture = async (req, res, next) => {
+  try {
+    const { mission, vision, company_culture, benefits } = req.body;
+    
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    // Update company culture fields
+    if (mission !== undefined) recruiter.mission = mission;
+    if (vision !== undefined) recruiter.vision = vision;
+    if (company_culture !== undefined) recruiter.company_culture = company_culture;
+    if (benefits !== undefined) recruiter.benefits = benefits;
+    
+    await recruiter.save();
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        mission: recruiter.mission,
+        vision: recruiter.vision,
+        company_culture: recruiter.company_culture,
+        benefits: recruiter.benefits
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Add company benefit
+// @route   POST /api/recruiters/benefits
+// @access  Private/Recruiter
+exports.addBenefit = async (req, res, next) => {
+  try {
+    const { benefit } = req.body;
+    
+    if (!benefit || benefit.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Benefit description is required'
+      });
+    }
+    
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    if (!recruiter.benefits) {
+      recruiter.benefits = [];
+    }
+    
+    recruiter.benefits.push(benefit.trim());
+    await recruiter.save();
+    
+    res.status(201).json({
+      success: true,
+      data: recruiter.benefits
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Remove company benefit
+// @route   DELETE /api/recruiters/benefits/:index
+// @access  Private/Recruiter
+exports.removeBenefit = async (req, res, next) => {
+  try {
+    const { index } = req.params;
+    const benefitIndex = parseInt(index);
+    
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    if (!recruiter.benefits || benefitIndex < 0 || benefitIndex >= recruiter.benefits.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Benefit not found'
+      });
+    }
+    
+    recruiter.benefits.splice(benefitIndex, 1);
+    await recruiter.save();
+    
+    res.status(200).json({
+      success: true,
+      data: recruiter.benefits
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update social media links
+// @route   PUT /api/recruiters/social-links
+// @access  Private/Recruiter
+exports.updateSocialLinks = async (req, res, next) => {
+  try {
+    const { linkedin, facebook, twitter } = req.body;
+    
+    const recruiter = await Recruiter.findOne({ user_id: req.user.id });
+    
+    if (!recruiter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recruiter profile not found'
+      });
+    }
+    
+    if (!recruiter.social_links) {
+      recruiter.social_links = {};
+    }
+    
+    // Update social links
+    if (linkedin !== undefined) recruiter.social_links.linkedin = linkedin;
+    if (facebook !== undefined) recruiter.social_links.facebook = facebook;
+    if (twitter !== undefined) recruiter.social_links.twitter = twitter;
+    
+    await recruiter.save();
+    
+    res.status(200).json({
+      success: true,
+      data: recruiter.social_links
     });
   } catch (error) {
     next(error);

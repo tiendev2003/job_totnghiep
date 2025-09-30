@@ -10,28 +10,57 @@ Sơ đồ use case chi tiết các chức năng và mối quan hệ giữa các 
 ## Chức năng chính
 
 ### Ứng viên (Candidate)
-- **Quản lý tài khoản:** Đăng ký, đăng nhập, xác minh thông tin, quên mật khẩu
-- **Quản lý hồ sơ:** Tạo/cập nhật thông tin cá nhân, kinh nghiệm làm việc, học vấn, kỹ năng
-- **Quản lý CV:** Đính kèm, cập nhật CV
-- **Ứng tuyển:** Nộp đơn ứng tuyển, theo dõi trạng thái ứng tuyển
-- **Tìm kiếm việc làm:** Tìm kiếm theo từ khóa, danh mục, địa điểm
+- **Quản lý tài khoản:** 
+  - Đăng ký tài khoản mới với xác thực email
+  - Đăng nhập bằng email/mật khẩu hoặc Google OAuth
+  - Xác minh thông tin cá nhân và khôi phục mật khẩu
+- **Quản lý hồ sơ & CV:** 
+  - Tạo/cập nhật thông tin cá nhân, kinh nghiệm làm việc, học vấn, kỹ năng
+  - Đính kèm và cập nhật CV (PDF, DOC)
+  - Theo dõi trạng thái hồ sơ: Chờ duyệt, Phỏng vấn, Kết quả
+- **Tìm kiếm & gợi ý việc làm:** 
+  - Tìm kiếm với bộ lọc nâng cao: ngành nghề, kỹ năng, vị trí, mức lương, remote/on-site
+  - Nhận gợi ý việc làm từ AI (danh sách phù hợp, gửi qua email/thông báo)
+  - Lưu bài viết/tin tuyển dụng yêu thích vào mục "Sở thích"
+- **Ứng tuyển & tương tác:** 
+  - Nộp đơn trực tuyến, đính kèm CV
+  - Theo dõi trạng thái ứng tuyển
+  - Nhắn tin trực tiếp với nhà tuyển dụng
+  - Nhận thông báo khi nhà tuyển dụng xem CV hoặc từ chối
 - **Phỏng vấn:** Nhận lời mời phỏng vấn, sắp lịch phỏng vấn, xem lịch phỏng vấn
 - **Nhận phản hồi:** Xem đánh giá sau phỏng vấn
-- **AI hỗ trợ:** Nhận gợi ý công việc phù hợp từ AI
-- **Thông báo:** Nhận thông báo về trạng thái ứng tuyển, lịch phỏng vấn
-- **Tin nhắn:** Trao đổi với nhà tuyển dụng
+- **Báo cáo & tiện ích:** 
+  - Báo cáo bài đăng vi phạm (lừa đảo, thông tin sai...)
+  - Mua gói dịch vụ nâng cao để sử dụng thêm tính năng
 
 ### Nhà tuyển dụng (Recruiter)
-- **Quản lý tài khoản:** Đăng ký, đăng nhập, xác minh thông tin doanh nghiệp
-- **Quản lý tin tuyển dụng:** Tạo, sửa, xóa, tìm kiếm tin tuyển dụng
-- **Gói dịch vụ:** Đăng ký gói Premium, quản lý subscription
-- **Quản lý ứng viên:** Xem hồ sơ ứng viên, duyệt đơn ứng tuyển
-- **Phỏng vấn:** Tạo lịch phỏng vấn, gửi lời mời, quản lý lịch phỏng vấn
+- **Quản lý tài khoản:** 
+  - Đăng ký tài khoản công ty nhanh chóng, xác minh thông tin minh bạch
+  - Đăng nhập linh hoạt qua Email hoặc Google OAuth
+  - Xây dựng và cập nhật hồ sơ nhà tuyển dụng chuyên nghiệp
+- **Quản lý tin tuyển dụng:** 
+  - Đăng tin tuyển dụng với đầy đủ thông tin: tiêu đề, mô tả công việc (JD), yêu cầu kỹ năng, mức lương, thời hạn nhận hồ sơ
+  - Quản lý tin đăng: chỉnh sửa, gia hạn hoặc xóa tin chỉ trong vài thao tác
+  - Tìm kiếm và sắp xếp tin tuyển dụng
+- **Gói dịch vụ:** 
+  - Đăng ký gói Premium để mở rộng số lượng tin đăng (ví dụ: từ 20 tin nâng lên 100 tin)
+  - Quản lý subscription và tính năng nâng cao
+- **Quản lý ứng viên:** 
+  - Xem hồ sơ ứng viên, theo dõi danh sách ứng viên đã ứng tuyển
+  - Kết hợp bộ lọc thông minh để đánh giá hồ sơ nhanh chóng
+  - Duyệt đơn ứng tuyển và quản lý trạng thái
+- **Phỏng vấn:** 
+  - Tạo lịch phỏng vấn, gửi lời mời phỏng vấn
+  - Chủ động gửi thư mời phỏng vấn, sắp xếp lịch và thông báo kết quả ngay trên hệ thống
+  - Quản lý lịch phỏng vấn
 - **Đánh giá ứng viên:** Tạo phản hồi sau phỏng vấn
 - **AI hỗ trợ:** Nhận gợi ý ứng viên phù hợp từ AI
-- **Thanh toán:** Quản lý thanh toán cho các gói dịch vụ
+- **Tìm kiếm chủ động:** Chủ động tìm kiếm và tiếp cận nhân sự tiềm năng
+- **Thanh toán:** 
+  - Quản lý thanh toán cho các gói dịch vụ
+  - Tích hợp thanh toán online và hóa đơn điện tử
 - **Thông báo:** Nhận thông báo về đơn ứng tuyển mới
-- **Tin nhắn:** Trao đổi với ứng viên
+- **Tin nhắn:** Trao đổi trực tiếp qua tính năng nhắn tin tích hợp
 - **Báo cáo:** Xem thống kê tuyển dụng
 
 ### Hệ thống AI
@@ -98,6 +127,11 @@ Sơ đồ use case chi tiết các chức năng và mối quan hệ giữa các 
   - Thêm, sửa, xóa gói dịch vụ
   - Quản lý tính năng và giá cả
 
+- **Quản lý nội dung Blog/News:** 
+  - Duyệt và tổ chức các bài viết chia sẻ kiến thức
+  - Quản lý tin tức tuyển dụng và xu hướng ngành
+  - Thiết lập nội dung giáo dục và hướng dẫn nghề nghiệp
+
 - **Bảo trì hệ thống:**
   - Kiểm tra tình trạng hệ thống
   - Dọn dẹp dữ liệu cũ
@@ -117,7 +151,7 @@ Sơ đồ use case chi tiết các chức năng và mối quan hệ giữa các 
 - **Authentication:** JWT Token
 - **File Upload:** Multer
 - **Email Service:** NodeMailer
-- **Payment:**  Momo
+- **Payment:** Momo, VNPay (tích hợp thanh toán online và hóa đơn điện tử)
 
 ## Cấu trúc thư mục
 
@@ -227,9 +261,12 @@ npm run dev
 - `POST /api/auth/forgot-password` - Quên mật khẩu
 
 ### Jobs
-- `GET /api/jobs` - Danh sách việc làm
+- `GET /api/jobs` - Danh sách việc làm (hỗ trợ bộ lọc: ngành nghề, kỹ năng, vị trí, mức lương, remote/on-site)
 - `POST /api/jobs` - Tạo tin tuyển dụng (Recruiter)
 - `GET /api/jobs/:id` - Chi tiết việc làm
+- `POST /api/jobs/:id/favorite` - Lưu việc yêu thích
+- `DELETE /api/jobs/:id/favorite` - Bỏ lưu việc yêu thích
+- `GET /api/jobs/favorites` - Danh sách việc yêu thích của user
 
 ### Applications
 - `POST /api/applications` - Nộp đơn ứng tuyển
@@ -346,6 +383,15 @@ npm run dev
 - `DELETE /api/admin/email-templates/:id` - Xóa template
 - `POST /api/admin/emails/bulk` - Gửi email hàng loạt
 - `POST /api/admin/notifications/broadcast` - Gửi thông báo hệ thống
+
+**Blog/News Management:**
+- `GET /api/admin/blog-posts` - Danh sách bài viết blog
+- `POST /api/admin/blog-posts` - Tạo bài viết mới
+- `PUT /api/admin/blog-posts/:id` - Cập nhật bài viết
+- `DELETE /api/admin/blog-posts/:id` - Xóa bài viết
+- `PUT /api/admin/blog-posts/:id/publish` - Xuất bản bài viết
+- `GET /api/admin/news` - Quản lý tin tức tuyển dụng
+- `POST /api/admin/news` - Tạo tin tức mới
 
 **System Maintenance:**
 - `POST /api/admin/maintenance/cleanup` - Dọn dẹp dữ liệu

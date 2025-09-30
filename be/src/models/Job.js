@@ -55,6 +55,16 @@ const jobSchema = new mongoose.Schema({
     enum: ['onsite', 'remote', 'hybrid'],
     required: [true, 'Please specify work location type']
   },
+  positions_available: {
+    type: Number,
+    min: [1, 'Positions available must be at least 1'],
+    default: 1
+  },
+  seniority_level: {
+    type: String,
+    enum: ['entry', 'junior', 'mid', 'senior', 'lead', 'executive'],
+    default: 'junior'
+  },
   location: {
     address: {
       type: String,

@@ -98,6 +98,120 @@ const candidateSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Job'
   }],
+  
+  // Education (embedded array instead of separate table)
+  education: [{
+    school_name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [150, 'School name cannot be more than 150 characters']
+    },
+    degree: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [100, 'Degree cannot be more than 100 characters']
+    },
+    major: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [100, 'Major cannot be more than 100 characters']
+    },
+    start_date: {
+      type: Date,
+      required: true
+    },
+    end_date: {
+      type: Date,
+      validate: {
+        validator: function(v) {
+          return !v || v >= this.start_date;
+        },
+        message: 'End date must be after start date'
+      }
+    },
+    gpa: {
+      type: Number,
+      min: [0, 'GPA cannot be negative'],
+      max: [4.0, 'GPA cannot be more than 4.0']
+    },
+    description: {
+      type: String,
+      maxlength: [500, 'Description cannot be more than 500 characters']
+    },
+    is_current: {
+      type: Boolean,
+      default: false
+    }
+  }],
+  
+  // Work Experience (embedded array instead of separate table)
+  experience: [{
+    company_name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [100, 'Company name cannot be more than 100 characters']
+    },
+    position: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [100, 'Position cannot be more than 100 characters']
+    },
+    start_date: {
+      type: Date,
+      required: true
+    },
+    end_date: {
+      type: Date,
+      validate: {
+        validator: function(v) {
+          return !v || v >= this.start_date;
+        },
+        message: 'End date must be after start date'
+      }
+    },
+    description: {
+      type: String,
+      maxlength: [1000, 'Description cannot be more than 1000 characters']
+    },
+    is_current: {
+      type: Boolean,
+      default: false
+    },
+    technologies: [{
+      type: String,
+      trim: true
+    }]
+  }],
+  
+  // Skills (embedded array instead of separate table)
+  skills_detailed: [{
+    skill_name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [50, 'Skill name cannot be more than 50 characters']
+    },
+    skill_level: {
+      type: String,
+      enum: ['beginner', 'intermediate', 'advanced', 'expert'],
+      required: true
+    },
+    years_of_experience: {
+      type: Number,
+      min: [0, 'Years of experience cannot be negative'],
+      max: [50, 'Years of experience cannot be more than 50'],
+      default: 0
+    },
+    is_primary: {
+      type: Boolean,
+      default: false
+    }
+  }],
   cv_file_url: {
     type: String,
     default: null

@@ -1,12 +1,8 @@
 // User & Authentication Models
 const User = require('./User');
-const UserVerification = require('./UserVerification');
 
 // Candidate Models
 const Candidate = require('./Candidate');
-const CandidateExperience = require('./CandidateExperience');
-const CandidateEducation = require('./CandidateEducation');
-const CandidateSkill = require('./CandidateSkill');
 
 // Recruiter Models
 const Recruiter = require('./Recruiter');
@@ -16,6 +12,7 @@ const ServicePlan = require('./ServicePlan');
 // Job Models
 const Job = require('./Job');
 const JobCategory = require('./JobCategory');
+const FavoriteJob = require('./FavoriteJob');
 
 // Application Models
 const Application = require('./Application');
@@ -26,8 +23,7 @@ const Interview = require('./Interview');
 const InterviewFeedback = require('./InterviewFeedback');
 
 // AI & Recommendation Models
-const AIJobRecommendation = require('./AIJobRecommendation');
-const AICandidateRecommendation = require('./AICandidateRecommendation');
+const AIRecommendation = require('./AIRecommendation');
 const AIUserPreferences = require('./AIUserPreferences');
 const AIFeedback = require('./AIFeedback');
 
@@ -35,6 +31,9 @@ const AIFeedback = require('./AIFeedback');
 const Notification = require('./Notification');
 const Message = require('./Message');
 const EmailTemplate = require('./EmailTemplate');
+
+// Content Management Models
+const Content = require('./Content');
 
 // Admin & Report Models
 const Report = require('./Report');
@@ -49,13 +48,9 @@ const UserActivity = require('./UserActivity');
 module.exports = {
   // User & Authentication
   User,
-  UserVerification,
   
   // Candidate
   Candidate,
-  CandidateExperience,
-  CandidateEducation,
-  CandidateSkill,
   
   // Recruiter
   Recruiter,
@@ -65,6 +60,7 @@ module.exports = {
   // Job
   Job,
   JobCategory,
+  FavoriteJob,
   
   // Application
   Application,
@@ -75,8 +71,7 @@ module.exports = {
   InterviewFeedback,
   
   // AI & Recommendations
-  AIJobRecommendation,
-  AICandidateRecommendation,
+  AIRecommendation,
   AIUserPreferences,
   AIFeedback,
   
@@ -84,6 +79,9 @@ module.exports = {
   Notification,
   Message,
   EmailTemplate,
+  
+  // Content Management
+  Content,
   
   // Admin & Reports
   Report,
