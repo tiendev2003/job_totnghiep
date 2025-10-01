@@ -1,16 +1,17 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router';
-import { Suspense, lazy } from 'react';
-import Layout from '@/components/layout/Layout';
-import AdminLayout from '@/components/layout/AdminLayout';
-import RecruiterLayout from '@/components/layout/RecruiterLayout';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PublicRoute from '@/components/common/PublicRoute';
+import AdminLayout from '@/components/layout/AdminLayout';
+import Layout from '@/components/layout/Layout';
+import RecruiterLayout from '@/components/layout/RecruiterLayout';
+import { lazy, Suspense } from 'react';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 
 // Lazy load pages
 const Home = lazy(() => import('@/pages/Home'));
 const Login = lazy(() => import('@/pages/auth/Login'));
 const Register = lazy(() => import('@/pages/auth/Register'));
+const VerifyEmail = lazy(() => import('@/pages/auth/VerifyEmail'));
 const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'));
 const Jobs = lazy(() => import('@/pages/jobs/Jobs'));
 const JobDetail = lazy(() => import('@/pages/jobs/JobDetail'));
@@ -55,6 +56,13 @@ const SuspenseWrapper = ({ children }) => (
   </Suspense>
 );
 
+// Special wrapper for auth components to preserve state
+const AuthSuspenseWrapper = ({ children }) => (
+  <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>}>
+    {children}
+  </Suspense>
+);
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -84,14 +92,14 @@ const router = createBrowserRouter([
           </SuspenseWrapper>
         ),
       },
-      // Auth routes (public only)
+      // Auth routes (public only) - No SuspenseWrapper to prevent state loss
       {
         path: 'login',
         element: (
           <PublicRoute>
-            <SuspenseWrapper>
+            <Suspense fallback={<LoadingSpinner />}>
               <Login />
-            </SuspenseWrapper>
+            </Suspense>
           </PublicRoute>
         ),
       },
@@ -99,9 +107,19 @@ const router = createBrowserRouter([
         path: 'register',
         element: (
           <PublicRoute>
-            <SuspenseWrapper>
+            <Suspense fallback={<LoadingSpinner />}>
               <Register />
-            </SuspenseWrapper>
+            </Suspense>
+          </PublicRoute>
+        ),
+      },
+      {
+        path: 'verify-email',
+        element: (
+          <PublicRoute>
+            <Suspense fallback={<LoadingSpinner />}>
+              <VerifyEmail />
+            </Suspense>
           </PublicRoute>
         ),
       },
@@ -109,9 +127,9 @@ const router = createBrowserRouter([
         path: 'forgot-password',
         element: (
           <PublicRoute>
-            <SuspenseWrapper>
+            <Suspense fallback={<LoadingSpinner />}>
               <ForgotPassword />
-            </SuspenseWrapper>
+            </Suspense>
           </PublicRoute>
         ),
       },

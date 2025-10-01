@@ -1,5 +1,5 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import authService from '@/services/authService';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
 // Async thunks
 export const loginUser = createAsyncThunk(
@@ -7,10 +7,11 @@ export const loginUser = createAsyncThunk(
   async ({ email, password }, { rejectWithValue }) => {
     try {
       const response = await authService.login(email, password);
-       localStorage.setItem('token', response.token);
-      return response.data;
+      localStorage.setItem('token', response.token);
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+      const errorMessage = error.message || 'Login failed';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -20,9 +21,10 @@ export const registerUser = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const response = await authService.register(userData);
-      return response.data;
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+      const errorMessage = error.message || 'Registration failed';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -34,7 +36,8 @@ export const getCurrentUser = createAsyncThunk(
       const response = await authService.getCurrentUser();
       return response;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to get user info');
+      const errorMessage = error.message || 'Failed to get user info';
+      return rejectWithValue(errorMessage);
     }
   }
 );

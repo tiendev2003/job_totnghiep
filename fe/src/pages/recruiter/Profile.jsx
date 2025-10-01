@@ -1,4 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  FaBuilding,
+  FaCamera,
+  FaEdit,
+  FaEnvelope,
+  FaFacebook,
+  FaGlobe,
+  FaLinkedin,
+  FaMapMarkerAlt,
+  FaPhone,
+  FaPlus,
+  FaSave,
+  FaTimes,
+  FaTrash,
+  FaTwitter,
+  FaUser
+} from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import recruiterService from '../../services/recruiterService';
 import { formatDate } from '../../utils/formatters';
@@ -8,30 +25,88 @@ const RecruiterProfile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [editMode, setEditMode] = useState(false);
 
+  // Helper function to validate URLs
+  const isValidUrl = (url) => {
+    if (!url || url.trim() === '') return true; // Empty URLs are allowed
+    try {
+      new URL(url);
+      return url.startsWith('http://') || url.startsWith('https://');
+    } catch {
+      return false;
+    }
+  };
+
+  // Helper function to validate email
+  const isValidEmail = (email) => {
+    if (!email || email.trim() === '') return true; // Empty emails are allowed
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    return emailRegex.test(email);
+  };
+
+  // Helper function to clean and validate profile data
+  const validateAndCleanData = () => {
+    const errors = [];
+
+    // Validate required fields
+    if (!companyInfo.company_name?.trim()) {
+      errors.push('Tên công ty là bắt buộc');
+    }
+
+    // Validate email formats
+    if (!isValidEmail(companyInfo.company_email)) {
+      errors.push('Email công ty không hợp lệ');
+    }
+    if (!isValidEmail(personalInfo.contact_email)) {
+      errors.push('Email liên hệ không hợp lệ');
+    }
+
+    // Validate URLs
+    if (!isValidUrl(companyInfo.website)) {
+      errors.push('Website không hợp lệ (phải bắt đầu bằng http:// hoặc https://)');
+    }
+    if (!isValidUrl(personalInfo.social_links?.linkedin)) {
+      errors.push('LinkedIn URL không hợp lệ');
+    }
+    if (!isValidUrl(personalInfo.social_links?.facebook)) {
+      errors.push('Facebook URL không hợp lệ');
+    }
+    if (!isValidUrl(personalInfo.social_links?.twitter)) {
+      errors.push('Twitter URL không hợp lệ');
+    }
+
+    // Validate founded year
+    if (companyInfo.founded_year && (companyInfo.founded_year < 1800 || companyInfo.founded_year > new Date().getFullYear())) {
+      errors.push('Năm thành lập không hợp lệ');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
+  // Company Information State
   const [companyInfo, setCompanyInfo] = useState({
     company_name: '',
     company_description: '',
     industry: '',
-    company_size: '',
+    company_size: null, // Use null instead of empty string for enum fields
     website: '',
     company_email: '',
     company_phone: '',
     company_address: '',
-    founded_year: '',
+    founded_year: null, // Use null for number fields
     logo_url: '',
     cover_image_url: '',
-    social_links: {
-      linkedin: '',
-      facebook: '',
-      twitter: ''
-    },
-    benefits: [],
-    company_culture: '',
     mission: '',
-    vision: ''
+    vision: '',
+    company_culture: '',
+    benefits: []
   });
 
+  // Personal Information State
   const [personalInfo, setPersonalInfo] = useState({
     contact_person_name: '',
     contact_email: '',
@@ -41,7 +116,12 @@ const RecruiterProfile = () => {
     bio: '',
     avatar_url: '',
     skills: [],
-    languages: []
+    languages: [],
+    social_links: {
+      linkedin: '',
+      facebook: '',
+      twitter: ''
+    }
   });
 
   useEffect(() => {
@@ -54,7 +134,6 @@ const RecruiterProfile = () => {
       const response = await recruiterService.getProfile();
       const profileData = response.data;
       
-      console.log('Profile data loaded:', profileData); // Debug log
       setProfile(profileData);
       
       // Set company info
@@ -62,23 +141,18 @@ const RecruiterProfile = () => {
         company_name: profileData.company_name || '',
         company_description: profileData.company_description || '',
         industry: profileData.industry || '',
-        company_size: profileData.company_size || '',
+        company_size: profileData.company_size || null,
         website: profileData.website || '',
         company_email: profileData.company_email || '',
         company_phone: profileData.company_phone || '',
         company_address: profileData.company_address || '',
-        founded_year: profileData.founded_year || '',
+        founded_year: profileData.founded_year || null,
         logo_url: profileData.logo_url || '',
         cover_image_url: profileData.cover_image_url || '',
-        social_links: profileData.social_links || {
-          linkedin: '',
-          facebook: '',
-          twitter: ''
-        },
-        benefits: Array.isArray(profileData.benefits) ? profileData.benefits : [],
-        company_culture: profileData.company_culture || '',
         mission: profileData.mission || '',
-        vision: profileData.vision || ''
+        vision: profileData.vision || '',
+        company_culture: profileData.company_culture || '',
+        benefits: profileData.benefits || []
       });
 
       // Set personal info
@@ -90,22 +164,14 @@ const RecruiterProfile = () => {
         department: profileData.department || '',
         bio: profileData.bio || '',
         avatar_url: profileData.avatar_url || '',
-        skills: Array.isArray(profileData.skills) ? profileData.skills : [],
-        languages: Array.isArray(profileData.languages) ? profileData.languages : []
+        skills: profileData.skills || [],
+        languages: profileData.languages || [],
+        social_links: {
+          linkedin: profileData.social_links?.linkedin || '',
+          facebook: profileData.social_links?.facebook || '',
+          twitter: profileData.social_links?.twitter || ''
+        }
       });
-
-      console.log('Personal info set:', {
-        contact_person_name: profileData.contact_person_name || '',
-        contact_email: profileData.contact_email || '',
-        contact_phone: profileData.contact_phone || '',
-        position: profileData.position || '',
-        department: profileData.department || '',
-        bio: profileData.bio || '',
-        avatar_url: profileData.avatar_url || '',
-        skills: Array.isArray(profileData.skills) ? profileData.skills : [],
-        languages: Array.isArray(profileData.languages) ? profileData.languages : []
-      }); // Debug log
-
     } catch (error) {
       console.error('Error loading profile:', error);
       toast.error('Không thể tải thông tin hồ sơ');
@@ -114,78 +180,70 @@ const RecruiterProfile = () => {
     }
   };
 
-  const saveProfile = async () => {
+  const handleSaveProfile = async () => {
     try {
       setSaving(true);
       
-      // Validate required fields
-      if (!companyInfo.company_name?.trim()) {
-        toast.error('Tên công ty là bắt buộc');
+      // Validate data before sending
+      const validation = validateAndCleanData();
+      if (!validation.isValid) {
+        validation.errors.forEach(error => toast.error(error));
         return;
       }
-      
-      const profileData = {
+
+      // Validate and clean data before sending
+      const cleanedProfileData = {
         ...companyInfo,
         ...personalInfo,
+        // Handle enum fields - convert empty strings to null
+        company_size: companyInfo.company_size || null,
+        // Convert empty strings to null for optional fields that might have validation
+        founded_year: companyInfo.founded_year || null,
+        website: companyInfo.website?.trim() || null,
+        company_email: companyInfo.company_email?.trim() || null,
+        company_phone: companyInfo.company_phone?.trim() || null,
+        company_address: companyInfo.company_address?.trim() || null,
+        contact_email: personalInfo.contact_email?.trim() || null,
+        contact_phone: personalInfo.contact_phone?.trim() || null,
         // Ensure arrays are properly formatted
         benefits: Array.isArray(companyInfo.benefits) ? companyInfo.benefits.filter(b => b?.trim()) : [],
         skills: Array.isArray(personalInfo.skills) ? personalInfo.skills.filter(s => s?.trim()) : [],
         languages: Array.isArray(personalInfo.languages) ? personalInfo.languages.filter(l => l?.trim()) : [],
-        // Ensure social_links object exists
+        // Ensure social_links object exists with proper URL validation
         social_links: {
-          linkedin: companyInfo.social_links?.linkedin || '',
-          facebook: companyInfo.social_links?.facebook || '',
-          twitter: companyInfo.social_links?.twitter || ''
+          linkedin: personalInfo.social_links?.linkedin?.trim() || null,
+          facebook: personalInfo.social_links?.facebook?.trim() || null,
+          twitter: personalInfo.social_links?.twitter?.trim() || null
         }
       };
+
+      // Remove any undefined or empty string values, but keep null values
+      Object.keys(cleanedProfileData).forEach(key => {
+        if (cleanedProfileData[key] === '' || cleanedProfileData[key] === undefined) {
+          cleanedProfileData[key] = null;
+        }
+      });
       
-      console.log('Saving profile data:', profileData); // Debug log
+      console.log('Sending profile data:', cleanedProfileData); // Debug log
       
-      await recruiterService.updateProfile(profileData);
+      await recruiterService.updateProfile(cleanedProfileData);
       toast.success('Cập nhật hồ sơ thành công!');
+      setEditMode(false);
       await loadProfile(); // Reload to get updated data
     } catch (error) {
       console.error('Error saving profile:', error);
-      toast.error(error.response?.data?.message || error.message || 'Có lỗi xảy ra khi cập nhật hồ sơ');
+      // Better error handling
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.message) {
+        toast.error(error.message);
+      } else {
+        toast.error('Có lỗi xảy ra khi cập nhật hồ sơ');
+      }
     } finally {
       setSaving(false);
     }
   };
-
-  const [notifications, setNotifications] = useState({
-    emailNotifications: {
-      newApplications: true,
-      interviewReminders: true,
-      messageReceived: true,
-      subscriptionUpdates: false,
-      marketingEmails: false
-    },
-    pushNotifications: {
-      newApplications: true,
-      interviewReminders: true,
-      messageReceived: false,
-      systemUpdates: true
-    },
-    frequency: 'immediately' // immediately, daily, weekly
-  });
-
-  const [security, setSecurity] = useState({
-    twoFactorAuth: false,
-    loginNotifications: true,
-    passwordLastChanged: '2024-01-01',
-    activeDevices: [
-      { id: 1, name: 'MacBook Pro', location: 'Hà Nội', lastAccess: '2024-01-16 14:30', current: true },
-      { id: 2, name: 'iPhone 13', location: 'Hà Nội', lastAccess: '2024-01-16 12:15', current: false },
-      { id: 3, name: 'Chrome on Windows', location: 'Hà Nội', lastAccess: '2024-01-15 18:45', current: false }
-    ]
-  });
-
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
 
   const handleCompanyUpdate = (field, value) => {
     setCompanyInfo(prev => ({
@@ -201,24 +259,28 @@ const RecruiterProfile = () => {
     }));
   };
 
-  const handleNotificationUpdate = (category, field, value) => {
-    setNotifications(prev => ({
+  const handleSocialLinkUpdate = (platform, value) => {
+    setPersonalInfo(prev => ({
       ...prev,
-      [category]: {
-        ...prev[category],
-        [field]: value
+      social_links: {
+        ...prev.social_links,
+        [platform]: value
       }
     }));
   };
 
   const addBenefit = () => {
-    const newBenefit = prompt('Nhập phúc lợi mới:');
-    if (newBenefit && newBenefit.trim()) {
-      setCompanyInfo(prev => ({
-        ...prev,
-        benefits: [...(prev.benefits || []), newBenefit.trim()]
-      }));
-    }
+    setCompanyInfo(prev => ({
+      ...prev,
+      benefits: [...prev.benefits, '']
+    }));
+  };
+
+  const updateBenefit = (index, value) => {
+    setCompanyInfo(prev => ({
+      ...prev,
+      benefits: prev.benefits.map((benefit, i) => i === index ? value : benefit)
+    }));
   };
 
   const removeBenefit = (index) => {
@@ -229,13 +291,17 @@ const RecruiterProfile = () => {
   };
 
   const addSkill = () => {
-    const newSkill = prompt('Nhập kỹ năng mới:');
-    if (newSkill && newSkill.trim()) {
-      setPersonalInfo(prev => ({
-        ...prev,
-        skills: [...(prev.skills || []), newSkill.trim()]
-      }));
-    }
+    setPersonalInfo(prev => ({
+      ...prev,
+      skills: [...prev.skills, '']
+    }));
+  };
+
+  const updateSkill = (index, value) => {
+    setPersonalInfo(prev => ({
+      ...prev,
+      skills: prev.skills.map((skill, i) => i === index ? value : skill)
+    }));
   };
 
   const removeSkill = (index) => {
@@ -246,13 +312,17 @@ const RecruiterProfile = () => {
   };
 
   const addLanguage = () => {
-    const newLanguage = prompt('Nhập ngôn ngữ mới:');
-    if (newLanguage && newLanguage.trim()) {
-      setPersonalInfo(prev => ({
-        ...prev,
-        languages: [...(prev.languages || []), newLanguage.trim()]
-      }));
-    }
+    setPersonalInfo(prev => ({
+      ...prev,
+      languages: [...prev.languages, '']
+    }));
+  };
+
+  const updateLanguage = (index, value) => {
+    setPersonalInfo(prev => ({
+      ...prev,
+      languages: prev.languages.map((language, i) => i === index ? value : language)
+    }));
   };
 
   const removeLanguage = (index) => {
@@ -263,746 +333,710 @@ const RecruiterProfile = () => {
   };
 
   const tabs = [
-    { id: 'company', name: 'Thông tin công ty', icon: '🏢' },
-    { id: 'personal', name: 'Thông tin cá nhân', icon: '👤' },
-    { id: 'notifications', name: 'Thông báo', icon: '🔔' },
-    { id: 'security', name: 'Bảo mật', icon: '🔒' }
+    { id: 'company', label: 'Thông tin công ty', icon: FaBuilding },
+    { id: 'personal', label: 'Thông tin cá nhân', icon: FaUser }
   ];
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Hồ sơ của tôi</h1>
-        <button 
-          onClick={saveProfile}
-          disabled={saving}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saving ? (
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Đang lưu...
-            </div>
-          ) : (
-            'Lưu thay đổi'
-          )}
-        </button>
-      </div>
-
-      {/* Profile Summary */}
-      {profile && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center space-x-4">
-            <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
-              {profile.logo_url || profile.company_logo_url ? (
-                <img src={profile.logo_url || profile.company_logo_url} alt="Logo" className="h-16 w-16 rounded-full object-cover" />
-              ) : (
-                <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m0 0h2M7 7h10M7 11h6m-6 4h10" />
-                </svg>
-              )}
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {profile.company_name || 'Chưa cập nhật tên công ty'}
-              </h2>
-              <p className="text-gray-600">{profile.industry || 'Chưa cập nhật ngành nghề'}</p>
-              <p className="text-sm text-gray-500">
-                Tham gia từ {formatDate(profile.created_at)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.name}
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm mb-6 overflow-hidden">
+          {/* Cover Image */}
+          <div className="h-48 bg-gradient-to-r from-green-500 to-blue-600 relative">
+            {companyInfo.cover_image_url && (
+              <img 
+                src={companyInfo.cover_image_url} 
+                alt="Cover" 
+                className="w-full h-full object-cover"
+              />
+            )}
+            {editMode && (
+              <button className="absolute top-4 right-4 bg-white bg-opacity-80 rounded-full p-2 hover:bg-opacity-100 transition-all">
+                <FaCamera className="w-4 h-4 text-gray-600" />
               </button>
-            ))}
-          </nav>
-        </div>
+            )}
+          </div>
 
-        <div className="p-6">
-          {/* Company Info Tab */}
-          {activeTab === 'company' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tên công ty</label>
-                  <input
-                    type="text"
-                    value={companyInfo.company_name}
-                    onChange={(e) => setCompanyInfo({...companyInfo, company_name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ngành nghề</label>
-                  <select
-                    value={companyInfo.industry}
-                    onChange={(e) => setCompanyInfo({...companyInfo, industry: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  >
-                    <option value="">Chọn ngành nghề</option>
-                    <option value="Công nghệ thông tin">Công nghệ thông tin</option>
-                    <option value="Tài chính - Ngân hàng">Tài chính - Ngân hàng</option>
-                    <option value="Y tế">Y tế</option>
-                    <option value="Giáo dục">Giáo dục</option>
-                    <option value="Bán lẻ">Bán lẻ</option>
-                    <option value="Sản xuất">Sản xuất</option>
-                    <option value="Dịch vụ">Dịch vụ</option>
-                    <option value="Khác">Khác</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Quy mô công ty</label>
-                  <select
-                    value={companyInfo.company_size}
-                    onChange={(e) => setCompanyInfo({...companyInfo, company_size: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  >
-                    <option value="">Chọn quy mô</option>
-                    <option value="1-10">1-10 nhân viên</option>
-                    <option value="11-50">11-50 nhân viên</option>
-                    <option value="51-100">51-100 nhân viên</option>
-                    <option value="100-500">100-500 nhân viên</option>
-                    <option value="500+">500+ nhân viên</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Năm thành lập</label>
-                  <input
-                    type="number"
-                    value={companyInfo.founded_year}
-                    onChange={(e) => setCompanyInfo({...companyInfo, founded_year: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
-                  <input
-                    type="url"
-                    value={companyInfo.website}
-                    onChange={(e) => handleCompanyUpdate('website', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email công ty</label>
-                  <input
-                    type="email"
-                    value={companyInfo.company_email}
-                    onChange={(e) => handleCompanyUpdate('company_email', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
-                  <input
-                    type="tel"
-                    value={companyInfo.company_phone}
-                    onChange={(e) => handleCompanyUpdate('company_phone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Địa chỉ</label>
-                  <input
-                    type="text"
-                    value={companyInfo.company_address}
-                    onChange={(e) => handleCompanyUpdate('company_address', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả công ty</label>
-                <textarea
-                  rows={4}
-                  value={companyInfo.company_description}
-                  onChange={(e) => handleCompanyUpdate('company_description', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sứ mệnh</label>
-                  <textarea
-                    rows={3}
-                    value={companyInfo.mission}
-                    onChange={(e) => handleCompanyUpdate('mission', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tầm nhìn</label>
-                  <textarea
-                    rows={3}
-                    value={companyInfo.vision}
-                    onChange={(e) => handleCompanyUpdate('vision', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Văn hóa công ty</label>
-                <textarea
-                  rows={3}
-                  value={companyInfo.company_culture}
-                  onChange={(e) => handleCompanyUpdate('company_culture', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <label className="block text-sm font-medium text-gray-700">Phúc lợi</label>
-                  <button
-                    onClick={addBenefit}
-                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                  >
-                    Thêm phúc lợi
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {(companyInfo.benefits || []).map((benefit, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded">
-                      <span className="text-sm text-gray-700">{benefit}</span>
-                      <button
-                        onClick={() => removeBenefit(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Mạng xã hội</label>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <span className="w-20 text-sm text-gray-600">LinkedIn:</span>
-                    <input
-                      type="url"
-                      value={companyInfo.social_links?.linkedin || ''}
-                      onChange={(e) => setCompanyInfo({...companyInfo, social_links: {...(companyInfo.social_links || {}), linkedin: e.target.value}})}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+          {/* Profile Header */}
+          <div className="px-6 py-4">
+            <div className="flex items-center space-x-4">
+              <div className="relative -mt-16">
+                <div className="w-24 h-24 bg-white rounded-full p-1 shadow-lg">
+                  {companyInfo.logo_url ? (
+                    <img 
+                      src={companyInfo.logo_url} 
+                      alt="Logo" 
+                      className="w-full h-full object-cover rounded-full"
                     />
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="w-20 text-sm text-gray-600">Facebook:</span>
-                    <input
-                      type="url"
-                      value={companyInfo.social_links?.facebook || ''}
-                      onChange={(e) => setCompanyInfo({...companyInfo, social_links: {...(companyInfo.social_links || {}), facebook: e.target.value}})}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="w-20 text-sm text-gray-600">Twitter:</span>
-                    <input
-                      type="url"
-                      value={companyInfo.social_links?.twitter || ''}
-                      onChange={(e) => setCompanyInfo({...companyInfo, social_links: {...(companyInfo.social_links || {}), twitter: e.target.value}})}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Personal Info Tab */}
-          {activeTab === 'personal' && (
-            <div className="space-y-6">
-              {/* Debug info - remove in production */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="bg-gray-100 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Debug Info:</h4>
-                  <pre className="text-xs overflow-auto">
-                    {JSON.stringify(personalInfo, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              <div className="flex items-center space-x-6">
-                <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center">
-                  {personalInfo.avatar_url ? (
-                    <img src={personalInfo.avatar_url} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                   ) : (
-                    <span className="text-3xl text-gray-400">👤</span>
+                    <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center">
+                      <FaBuilding className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  {editMode && (
+                    <button className="absolute bottom-0 right-0 bg-green-600 rounded-full p-1.5 text-white hover:bg-green-700 transition-colors">
+                      <FaCamera className="w-3 h-3" />
+                    </button>
                   )}
                 </div>
-                <div>
-                  <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-3">
-                    Tải ảnh lên
-                  </button>
-                  <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50">
-                    Xóa ảnh
-                  </button>
-                </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Họ và tên <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={personalInfo.contact_person_name}
-                    onChange={(e) => handlePersonalUpdate('contact_person_name', e.target.value)}
-                    placeholder="Nhập họ và tên của bạn"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email liên hệ</label>
-                  <input
-                    type="email"
-                    value={personalInfo.contact_email}
-                    onChange={(e) => handlePersonalUpdate('contact_email', e.target.value)}
-                    placeholder="email@example.com"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
-                  <input
-                    type="tel"
-                    value={personalInfo.contact_phone}
-                    onChange={(e) => handlePersonalUpdate('contact_phone', e.target.value)}
-                    placeholder="0123456789"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Chức vụ</label>
-                  <input
-                    type="text"
-                    value={personalInfo.position}
-                    onChange={(e) => handlePersonalUpdate('position', e.target.value)}
-                    placeholder="Ví dụ: HR Manager, Tuyển dụng viên"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phòng ban</label>
-                  <input
-                    type="text"
-                    value={personalInfo.department}
-                    onChange={(e) => handlePersonalUpdate('department', e.target.value)}
-                    placeholder="Ví dụ: Phòng Nhân sự, Phòng Tuyển dụng"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Giới thiệu bản thân</label>
-                <textarea
-                  rows={4}
-                  value={personalInfo.bio}
-                  onChange={(e) => handlePersonalUpdate('bio', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                  placeholder="Mô tả ngắn về bản thân, kinh nghiệm và sở thích..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kỹ năng</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {(personalInfo.skills || []).map((skill, index) => (
-                      <span key={index} className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
-                        {skill}
-                        <button
-                          onClick={() => removeSkill(index)}
-                          className="ml-2 text-green-600 hover:text-green-800"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <button 
-                    onClick={addSkill}
-                    className="px-3 py-1 border border-dashed border-gray-300 text-gray-600 text-sm rounded-full hover:border-green-500 hover:text-green-600"
-                  >
-                    + Thêm kỹ năng
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ngôn ngữ</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {(personalInfo.languages || []).map((language, index) => (
-                      <span key={index} className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                        {language}
-                        <button
-                          onClick={() => removeLanguage(index)}
-                          className="ml-2 text-blue-600 hover:text-blue-800"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <button 
-                    onClick={addLanguage}
-                    className="px-3 py-1 border border-dashed border-gray-300 text-gray-600 text-sm rounded-full hover:border-blue-500 hover:text-blue-600"
-                  >
-                    + Thêm ngôn ngữ
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Thông báo qua Email</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Đơn ứng tuyển mới</p>
-                      <p className="text-sm text-gray-500">Nhận thông báo khi có đơn ứng tuyển mới</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.emailNotifications.newApplications}
-                      onChange={(e) => handleNotificationUpdate('emailNotifications', 'newApplications', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Nhắc nhở phỏng vấn</p>
-                      <p className="text-sm text-gray-500">Nhận nhắc nhở trước buổi phỏng vấn</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.emailNotifications.interviewReminders}
-                      onChange={(e) => handleNotificationUpdate('emailNotifications', 'interviewReminders', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Tin nhắn mới</p>
-                      <p className="text-sm text-gray-500">Nhận thông báo khi có tin nhắn từ ứng viên</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.emailNotifications.messageReceived}
-                      onChange={(e) => handleNotificationUpdate('emailNotifications', 'messageReceived', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Cập nhật gói đăng ký</p>
-                      <p className="text-sm text-gray-500">Thông báo về hóa đơn và thay đổi gói</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.emailNotifications.subscriptionUpdates}
-                      onChange={(e) => handleNotificationUpdate('emailNotifications', 'subscriptionUpdates', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Email marketing</p>
-                      <p className="text-sm text-gray-500">Nhận thông tin về tính năng mới và khuyến mãi</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.emailNotifications.marketingEmails}
-                      onChange={(e) => handleNotificationUpdate('emailNotifications', 'marketingEmails', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Thông báo đẩy</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Đơn ứng tuyển mới</p>
-                      <p className="text-sm text-gray-500">Thông báo ngay lập tức trên trình duyệt</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.pushNotifications.newApplications}
-                      onChange={(e) => handleNotificationUpdate('pushNotifications', 'newApplications', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Nhắc nhở phỏng vấn</p>
-                      <p className="text-sm text-gray-500">Nhắc nhở trước 30 phút</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.pushNotifications.interviewReminders}
-                      onChange={(e) => handleNotificationUpdate('pushNotifications', 'interviewReminders', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Tin nhắn mới</p>
-                      <p className="text-sm text-gray-500">Thông báo tin nhắn từ ứng viên</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.pushNotifications.messageReceived}
-                      onChange={(e) => handleNotificationUpdate('pushNotifications', 'messageReceived', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Cập nhật hệ thống</p>
-                      <p className="text-sm text-gray-500">Thông báo bảo trì và tính năng mới</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.pushNotifications.systemUpdates}
-                      onChange={(e) => handleNotificationUpdate('pushNotifications', 'systemUpdates', e.target.checked)}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tần suất thông báo</label>
-                <select
-                  value={notifications.frequency}
-                  onChange={(e) => setNotifications(prev => ({...prev, frequency: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="immediately">Ngay lập tức</option>
-                  <option value="daily">Hàng ngày</option>
-                  <option value="weekly">Hàng tuần</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Security Tab */}
-          {activeTab === 'security' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Bảo mật tài khoản</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Xác thực 2 yếu tố</p>
-                      <p className="text-sm text-gray-500">Tăng cường bảo mật với xác thực qua SMS hoặc ứng dụng</p>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={security.twoFactorAuth}
-                        onChange={(e) => setSecurity(prev => ({...prev, twoFactorAuth: e.target.checked}))}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                      />
-                      {security.twoFactorAuth && (
-                        <span className="text-sm text-green-600">Đã bật</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Thông báo đăng nhập</p>
-                      <p className="text-sm text-gray-500">Nhận email khi có đăng nhập từ thiết bị mới</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={security.loginNotifications}
-                      onChange={(e) => setSecurity(prev => ({...prev, loginNotifications: e.target.checked}))}
-                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Mật khẩu</h3>
-                  <button 
-                    onClick={() => setShowPasswordModal(true)}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                  >
-                    Đổi mật khẩu
-                  </button>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Lần thay đổi cuối: {new Date(security.passwordLastChanged).toLocaleDateString('vi-VN')}
+              
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {companyInfo.company_name || 'Chưa cập nhật tên công ty'}
+                </h1>
+                <p className="text-gray-600">{companyInfo.industry || 'Chưa cập nhật ngành nghề'}</p>
+                <p className="text-sm text-gray-500">
+                  Tham gia từ {formatDate(profile?.created_at)}
                 </p>
               </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Thiết bị đã đăng nhập</h3>
-                <div className="space-y-3">
-                  {(security.activeDevices || []).map((device) => (
-                    <div key={device.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {device.name}
-                            {device.current && <span className="ml-2 text-green-600">(Hiện tại)</span>}
-                          </p>
-                          <p className="text-sm text-gray-500">{device.location}</p>
-                          <p className="text-xs text-gray-400">Lần cuối: {device.lastAccess}</p>
-                        </div>
-                      </div>
-                      {!device.current && (
-                        <button className="text-red-600 hover:text-red-700 text-sm">
-                          Đăng xuất
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              
+              <div className="flex space-x-2">
+                {!editMode ? (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <FaEdit className="w-4 h-4" />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                ) : (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                      className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      <FaSave className="w-4 h-4" />
+                      <span>{saving ? 'Đang lưu...' : 'Lưu'}</span>
+                    </button>
+                    <button
+                      onClick={() => setEditMode(false)}
+                      className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <FaTimes className="w-4 h-4" />
+                      <span>Hủy</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Change Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Đổi mật khẩu</h3>
-              <button 
-                onClick={() => setShowPasswordModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mật khẩu hiện tại</label>
-                <input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData(prev => ({...prev, currentPassword: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mật khẩu mới</label>
-                <input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData(prev => ({...prev, newPassword: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Xác nhận mật khẩu mới</label>
-                <input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData(prev => ({...prev, confirmPassword: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button 
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Hủy
-                </button>
-                <button 
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                >
-                  Đổi mật khẩu
-                </button>
-              </div>
-            </form>
           </div>
         </div>
-      )}
+
+        {/* Tabs */}
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center space-x-2 py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === tab.id
+                        ? 'border-green-500 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-6">
+            {activeTab === 'company' && (
+              <CompanyInfoTab 
+                companyInfo={companyInfo}
+                editMode={editMode}
+                onUpdate={handleCompanyUpdate}
+                onAddBenefit={addBenefit}
+                onUpdateBenefit={updateBenefit}
+                onRemoveBenefit={removeBenefit}
+              />
+            )}
+            
+            {activeTab === 'personal' && (
+              <PersonalInfoTab 
+                personalInfo={personalInfo}
+                editMode={editMode}
+                onUpdate={handlePersonalUpdate}
+                onSocialLinkUpdate={handleSocialLinkUpdate}
+                onAddSkill={addSkill}
+                onUpdateSkill={updateSkill}
+                onRemoveSkill={removeSkill}
+                onAddLanguage={addLanguage}
+                onUpdateLanguage={updateLanguage}
+                onRemoveLanguage={removeLanguage}
+              />
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
+
+// Company Information Tab Component
+const CompanyInfoTab = ({ 
+  companyInfo, 
+  editMode, 
+  onUpdate, 
+  onAddBenefit, 
+  onUpdateBenefit, 
+  onRemoveBenefit 
+}) => (
+  <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Tên công ty *</label>
+        {editMode ? (
+          <input
+            type="text"
+            value={companyInfo.company_name}
+            onChange={(e) => onUpdate('company_name', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Nhập tên công ty"
+          />
+        ) : (
+          <p className="text-gray-900">{companyInfo.company_name || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Ngành nghề</label>
+        {editMode ? (
+          <input
+            type="text"
+            value={companyInfo.industry}
+            onChange={(e) => onUpdate('industry', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Ví dụ: Công nghệ thông tin"
+          />
+        ) : (
+          <p className="text-gray-900">{companyInfo.industry || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Quy mô công ty</label>
+        {editMode ? (
+          <select
+            value={companyInfo.company_size || ''}
+            onChange={(e) => onUpdate('company_size', e.target.value || null)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+          >
+            <option value="">Chọn quy mô</option>
+            <option value="1-10">1-10 nhân viên</option>
+            <option value="11-50">11-50 nhân viên</option>
+            <option value="51-100">51-100 nhân viên</option>
+            <option value="100-500">100-500 nhân viên</option>
+            <option value="500+">500+ nhân viên</option>
+          </select>
+        ) : (
+          <p className="text-gray-900">{companyInfo.company_size || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Năm thành lập</label>
+        {editMode ? (
+          <input
+            type="number"
+            value={companyInfo.founded_year || ''}
+            onChange={(e) => onUpdate('founded_year', e.target.value ? parseInt(e.target.value) : null)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="2020"
+            min="1800"
+            max={new Date().getFullYear()}
+          />
+        ) : (
+          <p className="text-gray-900">{companyInfo.founded_year || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
+        {editMode ? (
+          <input
+            type="url"
+            value={companyInfo.website}
+            onChange={(e) => onUpdate('website', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="https://example.com"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <FaGlobe className="w-4 h-4 text-gray-400" />
+            {companyInfo.website ? (
+              <a href={companyInfo.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {companyInfo.website}
+              </a>
+            ) : (
+              <span className="text-gray-900">Chưa cập nhật</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Email công ty</label>
+        {editMode ? (
+          <input
+            type="email"
+            value={companyInfo.company_email}
+            onChange={(e) => onUpdate('company_email', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="info@company.com"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <FaEnvelope className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-900">{companyInfo.company_email || 'Chưa cập nhật'}</span>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại công ty</label>
+        {editMode ? (
+          <input
+            type="tel"
+            value={companyInfo.company_phone}
+            onChange={(e) => onUpdate('company_phone', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="0123456789"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <FaPhone className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-900">{companyInfo.company_phone || 'Chưa cập nhật'}</span>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Địa chỉ</label>
+        {editMode ? (
+          <input
+            type="text"
+            value={companyInfo.company_address}
+            onChange={(e) => onUpdate('company_address', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="123 Đường ABC, Quận XYZ, TP.HCM"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <FaMapMarkerAlt className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-900">{companyInfo.company_address || 'Chưa cập nhật'}</span>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả công ty</label>
+      {editMode ? (
+        <textarea
+          rows={4}
+          value={companyInfo.company_description}
+          onChange={(e) => onUpdate('company_description', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+          placeholder="Mô tả về công ty của bạn..."
+        />
+      ) : (
+        <p className="text-gray-900 whitespace-pre-wrap">{companyInfo.company_description || 'Chưa cập nhật'}</p>
+      )}
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Sứ mệnh</label>
+        {editMode ? (
+          <textarea
+            rows={3}
+            value={companyInfo.mission}
+            onChange={(e) => onUpdate('mission', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Sứ mệnh của công ty..."
+          />
+        ) : (
+          <p className="text-gray-900 whitespace-pre-wrap">{companyInfo.mission || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Tầm nhìn</label>
+        {editMode ? (
+          <textarea
+            rows={3}
+            value={companyInfo.vision}
+            onChange={(e) => onUpdate('vision', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Tầm nhìn của công ty..."
+          />
+        ) : (
+          <p className="text-gray-900 whitespace-pre-wrap">{companyInfo.vision || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Văn hóa công ty</label>
+      {editMode ? (
+        <textarea
+          rows={3}
+          value={companyInfo.company_culture}
+          onChange={(e) => onUpdate('company_culture', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+          placeholder="Mô tả về văn hóa công ty..."
+        />
+      ) : (
+        <p className="text-gray-900 whitespace-pre-wrap">{companyInfo.company_culture || 'Chưa cập nhật'}</p>
+      )}
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Phúc lợi</label>
+      {editMode ? (
+        <div className="space-y-2">
+          {companyInfo.benefits.map((benefit, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={benefit}
+                onChange={(e) => onUpdateBenefit(index, e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                placeholder="Nhập phúc lợi..."
+              />
+              <button
+                onClick={() => onRemoveBenefit(index)}
+                className="text-red-600 hover:text-red-800 p-2"
+              >
+                <FaTrash className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={onAddBenefit}
+            className="flex items-center space-x-2 text-green-600 hover:text-green-800"
+          >
+            <FaPlus className="w-4 h-4" />
+            <span>Thêm phúc lợi</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {companyInfo.benefits.length > 0 ? (
+            companyInfo.benefits.map((benefit, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span className="text-gray-900">{benefit}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-900">Chưa cập nhật</p>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+// Personal Information Tab Component  
+const PersonalInfoTab = ({ 
+  personalInfo, 
+  editMode, 
+  onUpdate, 
+  onSocialLinkUpdate,
+  onAddSkill,
+  onUpdateSkill,
+  onRemoveSkill,
+  onAddLanguage,
+  onUpdateLanguage,
+  onRemoveLanguage
+}) => (
+  <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Tên người liên hệ</label>
+        {editMode ? (
+          <input
+            type="text"
+            value={personalInfo.contact_person_name}
+            onChange={(e) => onUpdate('contact_person_name', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Nhập tên người liên hệ"
+          />
+        ) : (
+          <p className="text-gray-900">{personalInfo.contact_person_name || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Email liên hệ</label>
+        {editMode ? (
+          <input
+            type="email"
+            value={personalInfo.contact_email}
+            onChange={(e) => onUpdate('contact_email', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="contact@company.com"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <FaEnvelope className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-900">{personalInfo.contact_email || 'Chưa cập nhật'}</span>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
+        {editMode ? (
+          <input
+            type="tel"
+            value={personalInfo.contact_phone}
+            onChange={(e) => onUpdate('contact_phone', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="0123456789"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <FaPhone className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-900">{personalInfo.contact_phone || 'Chưa cập nhật'}</span>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Chức vụ</label>
+        {editMode ? (
+          <input
+            type="text"
+            value={personalInfo.position}
+            onChange={(e) => onUpdate('position', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Ví dụ: HR Manager, Tuyển dụng viên"
+          />
+        ) : (
+          <p className="text-gray-900">{personalInfo.position || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Phòng ban</label>
+        {editMode ? (
+          <input
+            type="text"
+            value={personalInfo.department}
+            onChange={(e) => onUpdate('department', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+            placeholder="Ví dụ: Phòng Nhân sự, Phòng Tuyển dụng"
+          />
+        ) : (
+          <p className="text-gray-900">{personalInfo.department || 'Chưa cập nhật'}</p>
+        )}
+      </div>
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Giới thiệu bản thân</label>
+      {editMode ? (
+        <textarea
+          rows={4}
+          value={personalInfo.bio}
+          onChange={(e) => onUpdate('bio', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+          placeholder="Giới thiệu về bản thân và kinh nghiệm..."
+        />
+      ) : (
+        <p className="text-gray-900 whitespace-pre-wrap">{personalInfo.bio || 'Chưa cập nhật'}</p>
+      )}
+    </div>
+
+    {/* Skills */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Kỹ năng</label>
+      {editMode ? (
+        <div className="space-y-2">
+          {personalInfo.skills.map((skill, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={skill}
+                onChange={(e) => onUpdateSkill(index, e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                placeholder="Nhập kỹ năng..."
+              />
+              <button
+                onClick={() => onRemoveSkill(index)}
+                className="text-red-600 hover:text-red-800 p-2"
+              >
+                <FaTrash className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={onAddSkill}
+            className="flex items-center space-x-2 text-green-600 hover:text-green-800"
+          >
+            <FaPlus className="w-4 h-4" />
+            <span>Thêm kỹ năng</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {personalInfo.skills.length > 0 ? (
+            personalInfo.skills.map((skill, index) => (
+              <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                {skill}
+              </span>
+            ))
+          ) : (
+            <p className="text-gray-900">Chưa cập nhật</p>
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* Languages */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Ngôn ngữ</label>
+      {editMode ? (
+        <div className="space-y-2">
+          {personalInfo.languages.map((language, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={language}
+                onChange={(e) => onUpdateLanguage(index, e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                placeholder="Nhập ngôn ngữ..."
+              />
+              <button
+                onClick={() => onRemoveLanguage(index)}
+                className="text-red-600 hover:text-red-800 p-2"
+              >
+                <FaTrash className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={onAddLanguage}
+            className="flex items-center space-x-2 text-green-600 hover:text-green-800"
+          >
+            <FaPlus className="w-4 h-4" />
+            <span>Thêm ngôn ngữ</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {personalInfo.languages.length > 0 ? (
+            personalInfo.languages.map((language, index) => (
+              <span key={index} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                {language}
+              </span>
+            ))
+          ) : (
+            <p className="text-gray-900">Chưa cập nhật</p>
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* Social Links */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Liên kết mạng xã hội</label>
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <FaLinkedin className="w-5 h-5 text-blue-600" />
+          <label className="text-sm font-medium text-gray-700 w-20">LinkedIn:</label>
+          {editMode ? (
+            <input
+              type="url"
+              value={personalInfo.social_links.linkedin}
+              onChange={(e) => onSocialLinkUpdate('linkedin', e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+              placeholder="https://linkedin.com/in/username"
+            />
+          ) : (
+            <span className="text-gray-900">
+              {personalInfo.social_links.linkedin ? (
+                <a href={personalInfo.social_links.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  {personalInfo.social_links.linkedin}
+                </a>
+              ) : (
+                'Chưa cập nhật'
+              )}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <FaFacebook className="w-5 h-5 text-blue-800" />
+          <label className="text-sm font-medium text-gray-700 w-20">Facebook:</label>
+          {editMode ? (
+            <input
+              type="url"
+              value={personalInfo.social_links.facebook}
+              onChange={(e) => onSocialLinkUpdate('facebook', e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+              placeholder="https://facebook.com/username"
+            />
+          ) : (
+            <span className="text-gray-900">
+              {personalInfo.social_links.facebook ? (
+                <a href={personalInfo.social_links.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  {personalInfo.social_links.facebook}
+                </a>
+              ) : (
+                'Chưa cập nhật'
+              )}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <FaTwitter className="w-5 h-5 text-blue-400" />
+          <label className="text-sm font-medium text-gray-700 w-20">Twitter:</label>
+          {editMode ? (
+            <input
+              type="url"
+              value={personalInfo.social_links.twitter}
+              onChange={(e) => onSocialLinkUpdate('twitter', e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+              placeholder="https://twitter.com/username"
+            />
+          ) : (
+            <span className="text-gray-900">
+              {personalInfo.social_links.twitter ? (
+                <a href={personalInfo.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  {personalInfo.social_links.twitter}
+                </a>
+              ) : (
+                'Chưa cập nhật'
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default RecruiterProfile;

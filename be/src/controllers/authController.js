@@ -10,7 +10,7 @@ const { getClientIP } = require('../utils/adminUtils');
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { first_name, last_name, email, password, role, phone } = req.body;
+    const { first_name, last_name, full_name, username, email, password, role, phone } = req.body;
     
     // Kiểm tra email đã tồn tại chưa
     const existingUser = await User.findOne({ email });
@@ -21,16 +21,32 @@ exports.register = async (req, res, next) => {
       });
     }
     
+    // Xử lý tên nếu frontend gửi full_name thay vì first_name, last_name
+    let firstName = first_name;
+    let lastName = last_name;
+    
+    if (full_name && !first_name && !last_name) {
+      const nameParts = full_name.trim().split(' ');
+      firstName = nameParts[0];
+      lastName = nameParts.slice(1).join(' ') || nameParts[0]; // Nếu chỉ có 1 tên, dùng làm cả first và last
+    }
+    
     // Tạo user với trạng thái pending
-    const user = await User.create({
-      first_name: req.body.first_name,
-      last_name: req.body.last_name,
+    const userData = {
+      first_name: firstName,
+      last_name: lastName,
       email,
       password,
       role,
-      phone,
       account_status: 'pending'
-    });
+    };
+    
+    // Chỉ thêm phone nếu có giá trị
+    if (phone && phone.trim()) {
+      userData.phone = phone;
+    }
+    
+    const user = await User.create(userData);
     
     // Tạo role-specific profile
     if (role === 'candidate') {
@@ -236,22 +252,13 @@ exports.forgotPassword = async (req, res, next) => {
     // Tạo OTP
     const otp = generateSecureOTP();
     
-    // Xóa các verification cũ chưa sử dụng
-    await UserVerification.deleteMany({
-      user_id: user._id,
-      verification_type: 'password_reset',
-      is_used: false
-    });
-
-    // Tạo verification record mới
-    await UserVerification.create({
-      user_id: user._id,
-      verification_type: 'password_reset',
-      verification_code: otp,
+    // Cập nhật email verification trong user document với loại password_reset
+    user.email_verification = {
+      code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: getClientIP(req),
-      user_agent: req.get('User-Agent')
-    });
+      attempts: 0
+    };
+    await user.save();
 
     // Gửi OTP qua email
     await sendOTPEmail(email, otp, 'password_reset');
@@ -305,25 +312,14 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
-    // Tìm verification record
-    const verification = await UserVerification.findOne({
-      user_id: user._id,
-      verification_type: 'password_reset',
-      verification_code: otp,
-      is_used: false,
-      expires_at: { $gt: new Date() }
-    });
-
-    if (!verification) {
+    // Kiểm tra verification code trong user
+    if (!user.email_verification.code || 
+        user.email_verification.code !== otp ||
+        user.email_verification.expires_at < new Date()) {
+      
       // Tăng số lần thử
-      await UserVerification.updateOne(
-        {
-          user_id: user._id,
-          verification_type: 'password_reset',
-          is_used: false
-        },
-        { $inc: { attempts: 1 } }
-      );
+      user.email_verification.attempts = (user.email_verification.attempts || 0) + 1;
+      await user.save();
 
       return res.status(400).json({
         success: false,
@@ -332,19 +328,17 @@ exports.resetPassword = async (req, res, next) => {
     }
 
     // Kiểm tra số lần thử
-    if (verification.attempts >= 5) {
+    if (user.email_verification.attempts >= 5) {
       return res.status(429).json({
         success: false,
         message: 'Đã vượt quá số lần thử cho phép. Vui lòng yêu cầu mã OTP mới.'
       });
     }
 
-    // Cập nhật trạng thái verification
-    verification.is_used = true;
-    verification.used_at = new Date();
-    await verification.save();
-
-    // Cập nhật mật khẩu
+    // Xóa verification code và cập nhật mật khẩu
+    user.email_verification.code = null;
+    user.email_verification.expires_at = null;
+    user.email_verification.attempts = 0;
     user.password = newPassword;
     await user.save();
 
@@ -407,22 +401,13 @@ exports.resendOTP = async (req, res, next) => {
     // Tạo OTP mới
     const otp = generateSecureOTP();
     
-    // Xóa các verification cũ chưa sử dụng
-    await UserVerification.deleteMany({
-      user_id: user._id,
-      verification_type: type,
-      is_used: false
-    });
-
-    // Tạo verification record mới
-    await UserVerification.create({
-      user_id: user._id,
-      verification_type: type,
-      verification_code: otp,
+    // Cập nhật email verification trong user document
+    user.email_verification = {
+      code: otp,
       expires_at: createExpiryTime(15),
-      ip_address: getClientIP(req),
-      user_agent: req.get('User-Agent')
-    });
+      attempts: 0
+    };
+    await user.save();
 
     // Gửi OTP qua email
     const emailType = type === 'email_verification' ? 'verification' : 'password_reset';
@@ -474,10 +459,18 @@ exports.getMe = async (req, res, next) => {
 exports.updateDetails = async (req, res, next) => {
   try {
     const fieldsToUpdate = {
-      full_name: req.body.full_name,
+      first_name: req.body.first_name,
+      last_name: req.body.last_name,
       phone: req.body.phone,
       email: req.body.email
     };
+    
+    // Xử lý trường hợp frontend gửi full_name
+    if (req.body.full_name && !req.body.first_name && !req.body.last_name) {
+      const nameParts = req.body.full_name.trim().split(' ');
+      fieldsToUpdate.first_name = nameParts[0];
+      fieldsToUpdate.last_name = nameParts.slice(1).join(' ') || nameParts[0];
+    }
     
     const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
       new: true,
@@ -555,7 +548,8 @@ const sendTokenResponse = (user, statusCode, res, message = 'Thành công') => {
       token,
       data: {
         _id: user._id,
-        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name,
         email: user.email,
         role: user.role,
         full_name: user.full_name,

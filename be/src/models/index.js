@@ -44,6 +44,7 @@ const Payment = require('./Payment');
 // System Models
 const FileUpload = require('./FileUpload');
 const UserActivity = require('./UserActivity');
+const SystemSetting = require('./SystemSetting');
 
 module.exports = {
   // User & Authentication
@@ -91,5 +92,6 @@ module.exports = {
   
   // System
   FileUpload,
-  UserActivity
+  UserActivity,
+  SystemSetting
 };

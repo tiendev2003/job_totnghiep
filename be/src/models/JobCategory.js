@@ -12,6 +12,9 @@ const jobCategorySchema = new mongoose.Schema({
     type: String,
     get: function() {
       return this.category_name;
+    },
+    set: function(value) {
+      this.category_name = value;
     }
   },
   description: {

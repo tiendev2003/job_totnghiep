@@ -21,27 +21,27 @@ const authService = {
     return await apiClient.post('/auth/forgot-password', { email });
   },
 
-  // Reset Password
-  resetPassword: async (token, newPassword) => {
-    return await apiClient.post('/auth/reset-password', { token, newPassword });
+  // Reset Password with OTP
+  resetPassword: async (email, otp, newPassword) => {
+    return await apiClient.post('/auth/reset-password', { email, otp, newPassword });
   },
 
   // Change Password
   changePassword: async (currentPassword, newPassword) => {
-    return await apiClient.put('/auth/change-password', {
+    return await apiClient.put('/auth/updatepassword', {
       currentPassword,
       newPassword,
     });
   },
 
-  // Verify Email
-  verifyEmail: async (token) => {
-    return await apiClient.post('/auth/verify-email', { token });
+  // Verify Email/OTP
+  verifyOTP: async (email, otp) => {
+    return await apiClient.post('/auth/verify-otp', { email, otp });
   },
 
-  // Resend Verification Email
-  resendVerificationEmail: async (email) => {
-    return await apiClient.post('/auth/resend-verification', { email });
+  // Resend Verification OTP
+  resendOTP: async (email, type = 'email_verification') => {
+    return await apiClient.post('/auth/resend-otp', { email, type });
   },
 
   // Get Current User
@@ -51,7 +51,7 @@ const authService = {
 
   // Update Profile
   updateProfile: async (profileData) => {
-    return await apiClient.put('/auth/profile', profileData);
+    return await apiClient.put('/auth/updatedetails', profileData);
   },
 };
 

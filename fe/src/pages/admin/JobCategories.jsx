@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { toast } from 'react-toastify';
 import adminService from '@/services/adminService';
+import { useEffect, useState } from "react";
+import { toast } from 'react-toastify';
 
 const JobCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -9,7 +9,7 @@ const JobCategories = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
-    name: '',
+    category_name: '',
     description: '',
     is_active: true
   });
@@ -52,7 +52,7 @@ const JobCategories = () => {
   const handleEdit = (category) => {
     setEditingCategory(category);
     setFormData({
-      name: category.name || '',
+      category_name: category.category_name || category.name || '',
       description: category.description || '',
       is_active: category.is_active !== undefined ? category.is_active : true
     });
@@ -106,7 +106,7 @@ const JobCategories = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
+    if (!formData.category_name.trim()) {
       toast.error('Vui lòng nhập tên danh mục');
       return;
     }
@@ -115,17 +115,23 @@ const JobCategories = () => {
       setActionLoading(prev => ({ ...prev, submit: true }));
       let response;
       
+      // Prepare data with both fields for compatibility
+      const submitData = {
+        ...formData,
+        name: formData.category_name, // Alias for backward compatibility
+      };
+      
       if (editingCategory) {
-        response = await adminService.updateJobCategory(editingCategory._id || editingCategory.id, formData);
+        response = await adminService.updateJobCategory(editingCategory._id || editingCategory.id, submitData);
       } else {
-        response = await adminService.createJobCategory(formData);
+        response = await adminService.createJobCategory(submitData);
       }
 
       if (response.success) {
         toast.success(editingCategory ? 'Cập nhật danh mục thành công' : 'Thêm danh mục thành công');
         setIsModalOpen(false);
         setEditingCategory(null);
-        setFormData({ name: '', description: '', is_active: true });
+        setFormData({ category_name: '', description: '', is_active: true });
         fetchCategories();
         fetchCategoryStats();
       } else {
@@ -184,7 +190,7 @@ const JobCategories = () => {
         <button
           onClick={() => {
             setEditingCategory(null);
-            setFormData({ name: '', description: '', is_active: true });
+            setFormData({ category_name: '', description: '', is_active: true });
             setIsModalOpen(true);
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -260,7 +266,7 @@ const JobCategories = () => {
                     <tr key={categoryId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {category.name}
+                          {category.category_name || category.name}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -350,8 +356,8 @@ const JobCategories = () => {
                   </label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
+                    name="category_name"
+                    value={formData.category_name}
                     onChange={handleInputChange}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nhập tên danh mục"
@@ -392,7 +398,7 @@ const JobCategories = () => {
                     onClick={() => {
                       setIsModalOpen(false);
                       setEditingCategory(null);
-                      setFormData({ name: '', description: '', is_active: true });
+                      setFormData({ category_name: '', description: '', is_active: true });
                     }}
                     disabled={actionLoading.submit}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"

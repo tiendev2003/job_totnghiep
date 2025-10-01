@@ -40,7 +40,13 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     trim: true,
-    match: [/^\+?[1-9]\d{1,14}$/, 'Please add a valid phone number']
+    validate: {
+      validator: function(v) {
+        // Cho phép empty string, null, undefined hoặc phone number hợp lệ
+        return !v || v === '' || /^\+?[1-9]\d{1,14}$/.test(v);
+      },
+      message: 'Please add a valid phone number'
+    }
   },
   first_name: {
     type: String,

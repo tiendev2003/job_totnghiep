@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { clearError, registerUser } from '@/store/slices/authSlice';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { registerUser } from '@/store/slices/authSlice';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'react-toastify';
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    username: '',
-    full_name: '',
+    first_name: '',
+    last_name: '',
     email: '',
     password: '',
     confirmPassword: '',
     role: 'candidate',
+    phone: '',
     terms: false,
   });
 
@@ -19,8 +20,19 @@ const Register = () => {
   const navigate = useNavigate();
   const { isLoading, error } = useSelector((state) => state.auth);
 
+  // Clear error when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    // Clear error when user starts changing form data
+    if (error) {
+      dispatch(clearError());
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -29,8 +41,34 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
 
-    // Validation
+    // Clear any previous errors
+    if (error) {
+      dispatch(clearError());
+    }
+
+    // Client-side validation
+    if (!formData.first_name.trim()) {
+      toast.error('Vui lòng nhập tên');
+      return;
+    }
+
+    if (!formData.last_name.trim()) {
+      toast.error('Vui lòng nhập họ');
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      toast.error('Vui lòng nhập email');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      toast.error('Mật khẩu phải có ít nhất 8 ký tự');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Mật khẩu xác nhận không khớp');
       return;
@@ -42,18 +80,46 @@ const Register = () => {
     }
 
     try {
-      await dispatch(registerUser({
-        username: formData.username,
-        full_name: formData.full_name,
-        email: formData.email,
+      const userData = {
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        email: formData.email.trim(),
         password: formData.password,
         role: formData.role,
-      })).unwrap();
+      };
+      
+      // Chỉ thêm phone nếu có giá trị
+      if (formData.phone && formData.phone.trim()) {
+        userData.phone = formData.phone.trim();
+      }
+      
+      await dispatch(registerUser(userData)).unwrap();
       
       toast.success('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
-      navigate('/login');
+      
+      // Only navigate on success
+      navigate('/verify-email', { 
+        state: { 
+          email: formData.email.trim(),
+          message: 'Vui lòng kiểm tra email và nhập mã OTP để xác thực tài khoản.'
+        }
+      });
     } catch (error) {
-      toast.error(error || 'Đăng ký thất bại');
+      // Error will be displayed in the form via Redux state
+      console.error('Registration error details:', {
+        error: error,
+        message: error?.message,
+        type: typeof error,
+        stack: error?.stack
+      });
+      
+      // Show user-friendly error message
+      const errorMessage = typeof error === 'string' ? error : 
+                          error?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+      toast.error(errorMessage);
+      
+      // Explicitly prevent any navigation
+      return false;
     }
   };
 
@@ -75,36 +141,51 @@ const Register = () => {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
           <div className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Tên đăng nhập
+              <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">
+                Tên
               </label>
               <input
-                id="username"
-                name="username"
+                id="first_name"
+                name="first_name"
                 type="text"
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Nhập tên đăng nhập"
-                value={formData.username}
+                placeholder="Nhập tên của bạn"
+                value={formData.first_name}
                 onChange={handleChange}
               />
             </div>
 
             <div>
-              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
-                Họ và tên
+              <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">
+                Họ
               </label>
               <input
-                id="full_name"
-                name="full_name"
+                id="last_name"
+                name="last_name"
                 type="text"
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Nhập họ và tên"
-                value={formData.full_name}
+                placeholder="Nhập họ của bạn"
+                value={formData.last_name}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                Số điện thoại
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                placeholder="Nhập số điện thoại (tùy chọn)"
+                value={formData.phone}
                 onChange={handleChange}
               />
             </div>
@@ -200,7 +281,21 @@ const Register = () => {
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-              {error}
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Đăng ký thất bại
+                  </h3>
+                  <div className="mt-1 text-sm text-red-700">
+                    {error}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

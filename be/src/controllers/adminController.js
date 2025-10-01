@@ -8,6 +8,7 @@ const Notification = require('../models/Notification');
 const JobCategory = require('../models/JobCategory');
 const Candidate = require('../models/Candidate');
 const Recruiter = require('../models/Recruiter');
+const SystemSetting = require('../models/SystemSetting');
 const UserActivity = require('../models/UserActivity');
 const ServicePlan = require('../models/ServicePlan');
 const RecruiterSubscription = require('../models/RecruiterSubscription');
@@ -1672,59 +1673,13 @@ exports.getSubscriptionStats = async (req, res, next) => {
 // @access  Private/Admin
 exports.getSettings = async (req, res, next) => {
   try {
-    // Mock settings data - in real app, this would come from database
-    const settings = {
-      general: {
-        siteName: 'IT Jobs Platform',
-        siteDescription: 'Nền tảng tuyển dụng IT hàng đầu Việt Nam',
-        contactEmail: 'contact@itjobs.vn',
-        supportEmail: 'support@itjobs.vn',
-        maxJobPostingDays: 30,
-        maxFreeJobPosts: 3,
-        enableRegistration: true,
-        enableJobPosting: true,
-        enableUserReports: true
-      },
-      email: {
-        smtpHost: 'smtp.gmail.com',
-        smtpPort: 587,
-        smtpUser: 'noreply@itjobs.vn',
-        smtpPassword: '********',
-        fromEmail: 'noreply@itjobs.vn',
-        fromName: 'IT Jobs Platform'
-      },
-      seo: {
-        metaTitle: 'IT Jobs - Việc làm IT hàng đầu',
-        metaDescription: 'Tìm kiếm và ứng tuyển các vị trí việc làm IT tốt nhất tại Việt Nam',
-        metaKeywords: 'việc làm IT, tuyển dụng IT, jobs, careers',
-        ogTitle: 'IT Jobs Platform',
-        ogDescription: 'Nền tảng tuyển dụng IT hàng đầu Việt Nam',
-        ogImage: '/og-image.jpg'
-      },
-      payment: {
-        enablePayment: true,
-        currency: 'VND',
-        paymentMethods: ['vnpay', 'momo', 'bank_transfer'],
-        taxRate: 10
-      },
-      security: {
-        passwordMinLength: 8,
-        sessionTimeout: 24,
-        maxLoginAttempts: 5,
-        enableTwoFactor: false,
-        requireEmailVerification: true,
-        enableCaptcha: true
-      },
-      notifications: {
-        emailNotifications: true,
-        browserNotifications: true,
-        smsNotifications: false,
-        notifyNewUsers: true,
-        notifyNewJobs: true,
-        notifyNewApplications: true,
-        notifyReports: true
-      }
-    };
+    let settings = await SystemSetting.getAllSettings();
+    
+    // If no settings exist, initialize with defaults
+    if (Object.keys(settings).length === 0) {
+      await SystemSetting.initializeDefaults(req.user.id);
+      settings = await SystemSetting.getAllSettings();
+    }
 
     res.status(200).json({
       success: true,
@@ -1752,13 +1707,18 @@ exports.updateSettings = async (req, res, next) => {
       });
     }
 
-    // Mock update - in real app, this would save to database
-    console.log(`Updating ${section} settings:`, settingsData);
+    // Update settings in database
+    const updatedSetting = await SystemSetting.updateBySection(section, settingsData, req.user.id);
 
     res.status(200).json({
       success: true,
       message: `${section} settings updated successfully`,
-      data: settingsData
+      data: {
+        section: updatedSetting.section,
+        settings: updatedSetting.settings,
+        lastUpdatedBy: updatedSetting.last_updated_by,
+        updatedAt: updatedSetting.updated_at
+      }
     });
   } catch (error) {
     next(error);
@@ -1772,7 +1732,15 @@ exports.testEmailSettings = async (req, res, next) => {
   try {
     const { smtpHost, smtpPort, smtpUser, smtpPassword, fromEmail, testRecipient } = req.body;
 
-    // Mock email test - in real app, this would actually send a test email
+    // Validate required fields
+    if (!smtpHost || !smtpPort || !smtpUser || !fromEmail || !testRecipient) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required email settings'
+      });
+    }
+
+    // In a real application, you would use nodemailer or similar to send actual test email
     console.log('Testing email settings:', {
       smtpHost,
       smtpPort,
@@ -1784,8 +1752,20 @@ exports.testEmailSettings = async (req, res, next) => {
     // Simulate test delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Simulate random success/failure for demo
-    const isSuccess = Math.random() > 0.2; // 80% success rate
+    // Simulate validation - check if settings are reasonable
+    const isValidPort = smtpPort >= 25 && smtpPort <= 65535;
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testRecipient);
+    const isValidHost = smtpHost && smtpHost.length > 0;
+
+    if (!isValidPort || !isValidEmail || !isValidHost) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email settings. Please check your configuration.'
+      });
+    }
+
+    // For demo purposes, simulate random success/failure
+    const isSuccess = Math.random() > 0.1; // 90% success rate
 
     if (isSuccess) {
       res.status(200).json({
@@ -1795,7 +1775,7 @@ exports.testEmailSettings = async (req, res, next) => {
     } else {
       res.status(400).json({
         success: false,
-        message: 'Failed to send test email. Please check your settings.'
+        message: 'Failed to send test email. Please check your SMTP settings.'
       });
     }
   } catch (error) {
