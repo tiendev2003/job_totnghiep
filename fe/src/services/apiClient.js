@@ -38,6 +38,12 @@ class ApiClient {
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
+      // Check if response has content type application/json
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid content type');
+      }
+
       const data = await response.json();
       return data;
     } catch (error) {

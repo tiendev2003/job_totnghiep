@@ -60,6 +60,21 @@ const recruiterSchema = new mongoose.Schema({
     min: 1800,
     max: new Date().getFullYear()
   },
+  company_locations: [{
+    city: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    address: {
+      type: String,
+      trim: true
+    },
+    is_headquarters: {
+      type: Boolean,
+      default: false
+    }
+  }],
   logo_url: {
     type: String,
     default: null

@@ -57,7 +57,18 @@ async function seedJobCategories() {
   try {
     console.log('Seeding job categories...');
     
-    const jobCategories = await JobCategory.insertMany(jobCategoryData);
+    // Clear existing categories to avoid duplicates
+    await JobCategory.deleteMany({});
+    
+    const jobCategories = [];
+    
+    // Use save() instead of insertMany() to trigger pre-save middleware for slug generation
+    for (const categoryData of jobCategoryData) {
+      const category = new JobCategory(categoryData);
+      const savedCategory = await category.save();
+      jobCategories.push(savedCategory);
+    }
+    
     console.log(`Created ${jobCategories.length} job categories`);
     
     return jobCategories;

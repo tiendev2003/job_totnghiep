@@ -2,6 +2,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PublicRoute from '@/components/common/PublicRoute';
 import AdminLayout from '@/components/layout/AdminLayout';
+import CandidateLayout from '@/components/layout/CandidateLayout';
 import Layout from '@/components/layout/Layout';
 import RecruiterLayout from '@/components/layout/RecruiterLayout';
 import { lazy, Suspense } from 'react';
@@ -15,8 +16,17 @@ const VerifyEmail = lazy(() => import('@/pages/auth/VerifyEmail'));
 const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'));
 const Jobs = lazy(() => import('@/pages/jobs/Jobs'));
 const JobDetail = lazy(() => import('@/pages/jobs/JobDetail'));
+const Terms = lazy(() => import('@/pages/Terms'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
+const Blog = lazy(() => import('@/pages/Blog'));
+const BlogDetail = lazy(() => import('@/pages/BlogDetail'));
+const About = lazy(() => import('@/pages/About'));
+const FindCandidates = lazy(() => import('@/pages/FindCandidates'));
 const CandidateProfile = lazy(() => import('@/pages/candidate/Profile'));
 const CandidateDashboard = lazy(() => import('@/pages/candidate/Dashboard'));
+const CandidateJobs = lazy(() => import('@/pages/candidate/Jobs'));
+const CandidateApplications = lazy(() => import('@/pages/candidate/Applications'));
+const CandidateInterviews = lazy(() => import('@/pages/candidate/Interviews'));
 
 // Recruiter pages
 const RecruiterDashboard = lazy(() => import('@/pages/recruiter/Dashboard'));
@@ -92,6 +102,54 @@ const router = createBrowserRouter([
           </SuspenseWrapper>
         ),
       },
+      {
+        path: 'terms',
+        element: (
+          <SuspenseWrapper>
+            <Terms />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'privacy',
+        element: (
+          <SuspenseWrapper>
+            <Privacy />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'blog',
+        element: (
+          <SuspenseWrapper>
+            <Blog />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'blog/:id',
+        element: (
+          <SuspenseWrapper>
+            <BlogDetail />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'about',
+        element: (
+          <SuspenseWrapper>
+            <About />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'find-candidates',
+        element: (
+          <SuspenseWrapper>
+            <FindCandidates />
+          </SuspenseWrapper>
+        ),
+      },
       // Auth routes (public only) - No SuspenseWrapper to prevent state loss
       {
         path: 'login',
@@ -139,20 +197,54 @@ const router = createBrowserRouter([
         element: <ProtectedRoute allowedRoles={['candidate']} />,
         children: [
           {
-            path: 'dashboard',
-            element: (
-              <SuspenseWrapper>
-                <CandidateDashboard />
-              </SuspenseWrapper>
-            ),
+            index: true,
+            element: <Navigate to="/candidate/dashboard" replace />,
           },
           {
-            path: 'profile',
-            element: (
-              <SuspenseWrapper>
-                <CandidateProfile />
-              </SuspenseWrapper>
-            ),
+            path: '',
+            element: <CandidateLayout />,
+            children: [
+              {
+                path: 'dashboard',
+                element: (
+                  <SuspenseWrapper>
+                    <CandidateDashboard />
+                  </SuspenseWrapper>
+                ),
+              },
+              {
+                path: 'profile',
+                element: (
+                  <SuspenseWrapper>
+                    <CandidateProfile />
+                  </SuspenseWrapper>
+                ),
+              },
+              {
+                path: 'jobs',
+                element: (
+                  <SuspenseWrapper>
+                    <CandidateJobs />
+                  </SuspenseWrapper>
+                ),
+              },
+              {
+                path: 'applications',
+                element: (
+                  <SuspenseWrapper>
+                    <CandidateApplications />
+                  </SuspenseWrapper>
+                ),
+              },
+              {
+                path: 'interviews',
+                element: (
+                  <SuspenseWrapper>
+                    <CandidateInterviews />
+                  </SuspenseWrapper>
+                ),
+              },
+            ],
           },
         ],
       },

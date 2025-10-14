@@ -16,7 +16,7 @@ async function seedRecruiters() {
         user_id: recruiterUsers[0]._id,
         company_name: 'TechViet Solutions',
         company_description: 'Leading software development company specializing in web and mobile applications for international clients.',
-        company_size: '51-200',
+        company_size: '100-500',
         industry: 'Information Technology',
         website: 'https://techviet-solutions.com',
         tax_id: 'TV001234567',

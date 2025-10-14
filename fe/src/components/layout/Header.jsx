@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { useSelector, useDispatch } from "react-redux";
 import { logout } from "@/store/slices/authSlice";
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router";
 import { toast } from "react-toastify";
 
 const Header = () => {
@@ -56,7 +56,7 @@ const Header = () => {
             </Link>
             {/* tìm ứng viên */}
             <Link
-              to="/candidates"
+              to="/find-candidates"
               className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
               Tìm ứng viên
@@ -64,7 +64,7 @@ const Header = () => {
             {/*  bài blog */}
 
             <Link
-              to="/blogs"
+              to="/blog"
               className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
               Bài blog
@@ -191,6 +191,20 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Việc làm
+              </Link>
+              <Link
+                to="/find-candidates"
+                className="text-gray-700 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Tìm ứng viên
+              </Link>
+              <Link
+                to="/blog"
+                className="text-gray-700 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Bài blog
               </Link>
               <Link
                 to="/companies"

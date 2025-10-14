@@ -18,13 +18,18 @@ const jobSchema = new mongoose.Schema({
     maxlength: [5000, 'Job description cannot be more than 5000 characters']
   },
   requirements: {
-    type: String,
+    type: [String],
     required: [true, 'Please add job requirements'],
-    maxlength: [3000, 'Job requirements cannot be more than 3000 characters']
+    validate: {
+      validator: function(arr) {
+        return arr && arr.length > 0;
+      },
+      message: 'At least one requirement is required'
+    }
   },
   benefits: {
-    type: String,
-    maxlength: [2000, 'Job benefits cannot be more than 2000 characters']
+    type: [String],
+    default: []
   },
   salary_min: {
     type: Number,
@@ -167,6 +172,57 @@ const jobSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  is_hot: {
+    type: Boolean,
+    default: false
+  },
+  is_urgent: {
+    type: Boolean,
+    default: false
+  },
+  tags: [{
+    type: String,
+    trim: true
+  }],
+  nice_to_have_skills: [{
+    skill_name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    weight: {
+      type: Number,
+      min: 1,
+      max: 10,
+      default: 3
+    }
+  }],
+  working_conditions: {
+    working_hours: {
+      type: String,
+      trim: true,
+      default: '8:00 - 17:30 (Thứ 2 - Thứ 6)'
+    },
+    working_model: {
+      type: String,
+      enum: ['onsite', 'remote', 'hybrid'],
+      default: 'onsite'
+    },
+    probation_period: {
+      type: String,
+      trim: true,
+      default: '2 tháng'
+    },
+    start_date: {
+      type: String,
+      trim: true,
+      default: 'Thỏa thuận'
+    }
+  },
+  job_highlights: [{
+    type: String,
+    trim: true
+  }],
   categories: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'JobCategory'
