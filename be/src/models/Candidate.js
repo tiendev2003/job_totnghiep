@@ -35,10 +35,6 @@ const candidateSchema = new mongoose.Schema({
     min: [0, 'Experience years cannot be negative'],
     max: [50, 'Experience years cannot be more than 50']
   },
-  skills: [{
-    type: String,
-    trim: true
-  }],
   bio: {
     type: String,
     maxlength: [1000, 'Bio cannot be more than 1000 characters']
@@ -82,11 +78,6 @@ const candidateSchema = new mongoose.Schema({
     max: {
       type: Number,
       min: [0, 'Maximum salary cannot be negative']
-    },
-    currency: {
-      type: String,
-      enum: ['VND', 'USD', 'EUR'],
-      default: 'VND'
     }
   },
   job_status: {
@@ -94,10 +85,6 @@ const candidateSchema = new mongoose.Schema({
     enum: ['seeking', 'employed', 'not_seeking'],
     default: 'seeking'
   },
-  saved_jobs: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Job'
-  }],
   
   // Education (embedded array instead of separate table)
   education: [{
@@ -232,19 +219,7 @@ candidateSchema.pre(/^find/, function(next) {
   next();
 });
 
-// Virtual for full candidate profile
-candidateSchema.virtual('experiences', {
-  ref: 'CandidateExperience',
-  localField: '_id',
-  foreignField: 'candidate_id'
-});
-
-candidateSchema.virtual('educations', {
-  ref: 'CandidateEducation',
-  localField: '_id',
-  foreignField: 'candidate_id'
-});
-
+// Virtual for applications
 candidateSchema.virtual('applications', {
   ref: 'Application',
   localField: '_id',

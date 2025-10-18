@@ -54,6 +54,24 @@ const interviewSchema = new mongoose.Schema({
     type: String,
     maxlength: [1000, 'Notes cannot be more than 1000 characters']
   },
+  interviewers: [{
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    name: {
+      type: String,
+      trim: true
+    },
+    email: {
+      type: String,
+      trim: true
+    },
+    role: {
+      type: String,
+      trim: true
+    }
+  }],
   status: {
     type: String,
     enum: ['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show'],

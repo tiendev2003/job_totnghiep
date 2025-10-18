@@ -16,12 +16,6 @@ const paymentSchema = new mongoose.Schema({
     required: [true, 'Please add payment amount'],
     min: [0, 'Amount cannot be negative']
   },
-  currency: {
-    type: String,
-    enum: ['VND', 'USD', 'EUR'],
-    default: 'VND',
-    required: true
-  },
   payment_method: {
     type: String,
     enum: ['credit_card', 'debit_card', 'bank_transfer', 'paypal', 'momo', 'zalopay', 'vnpay'],
@@ -32,11 +26,7 @@ const paymentSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'],
     default: 'pending'
   },
-  transaction_id: {
-    type: String,
-    unique: true,
-    sparse: true
-  },
+ 
   gateway_response: {
     gateway: {
       type: String,
@@ -88,6 +78,24 @@ const paymentSchema = new mongoose.Schema({
   refunded_at: {
     type: Date,
     default: null
+  },
+  // Recurring subscription fields
+  is_recurring: {
+    type: Boolean,
+    default: false
+  },
+  billing_cycle: {
+    type: String,
+    enum: ['monthly', 'quarterly', 'yearly'],
+    default: null
+  },
+  next_billing_date: {
+    type: Date,
+    default: null
+  },
+  auto_renew: {
+    type: Boolean,
+    default: false
   },
   // Electronic invoice fields
   invoice: {

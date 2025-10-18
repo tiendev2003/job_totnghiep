@@ -13,6 +13,8 @@ const ServicePlan = require('./ServicePlan');
 const Job = require('./Job');
 const JobCategory = require('./JobCategory');
 const FavoriteJob = require('./FavoriteJob');
+const Skill = require('./Skill');
+const SavedSearch = require('./SavedSearch');
 
 // Application Models
 const Application = require('./Application');
@@ -37,6 +39,7 @@ const Content = require('./Content');
 
 // Admin & Report Models
 const Report = require('./Report');
+const CompanyReview = require('./CompanyReview');
 
 // Payment Models
 const Payment = require('./Payment');
@@ -62,6 +65,8 @@ module.exports = {
   Job,
   JobCategory,
   FavoriteJob,
+  Skill,
+  SavedSearch,
   
   // Application
   Application,
@@ -86,6 +91,7 @@ module.exports = {
   
   // Admin & Reports
   Report,
+  CompanyReview,
   
   // Payment
   Payment,

@@ -37,15 +37,8 @@ const applicationSchema = new mongoose.Schema({
     maxlength: [1000, 'Interviewer notes cannot be more than 1000 characters']
   },
   salary_offered: {
-    amount: {
-      type: Number,
-      min: [0, 'Salary offered cannot be negative']
-    },
-    currency: {
-      type: String,
-      enum: ['VND', 'USD', 'EUR'],
-      default: 'VND'
-    }
+    type: Number,
+    min: [0, 'Salary offered cannot be negative']
   },
   rejection_reason: {
     type: String,

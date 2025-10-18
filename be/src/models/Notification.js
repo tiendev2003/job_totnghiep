@@ -44,6 +44,20 @@ const notificationSchema = new mongoose.Schema({
     enum: ['low', 'medium', 'high', 'urgent'],
     default: 'medium'
   },
+  group_id: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  is_grouped: {
+    type: Boolean,
+    default: false
+  },
+  group_count: {
+    type: Number,
+    default: 1,
+    min: [1, 'Group count must be at least 1']
+  },
   read_at: {
     type: Date,
     default: null

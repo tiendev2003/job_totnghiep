@@ -180,17 +180,7 @@ const recruiterSchema = new mongoose.Schema({
     }
   },
   
-  // Legacy fields
-  tax_id: {
-    type: String,
-    trim: true,
-    unique: true,
-    sparse: true
-  },
-  company_logo_url: {
-    type: String,
-    default: null
-  },
+  // Company verification and subscription
   is_verified: {
     type: Boolean,
     default: false

@@ -42,46 +42,6 @@ const recruiterSubscriptionSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
-  },
-  // Keep backward compatibility
-  plan_type: {
-    type: String,
-    enum: ['basic', 'premium', 'enterprise']
-  },
-  price: {
-    type: Number,
-    min: [0, 'Price cannot be negative']
-  },
-  payment_status: {
-    type: String,
-    enum: ['pending', 'paid', 'failed', 'cancelled', 'refunded'],
-    default: 'pending'
-  },
-  features: {
-    job_posts_limit: {
-      type: Number,
-      default: 5
-    },
-    featured_jobs: {
-      type: Number,
-      default: 0
-    },
-    candidate_search: {
-      type: Boolean,
-      default: false
-    },
-    cv_downloads: {
-      type: Number,
-      default: 0
-    },
-    advanced_analytics: {
-      type: Boolean,
-      default: false
-    },
-    priority_support: {
-      type: Boolean,
-      default: false
-    }
   }
 }, {
   timestamps: { 

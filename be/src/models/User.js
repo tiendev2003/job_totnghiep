@@ -16,21 +16,25 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function() {
-      return !this.google_id; // Password not required if using Google OAuth
+      return !this.social_id; // Password not required if using social OAuth
     },
     minlength: 8,
     select: false
   },
-  // Google OAuth integration
-  google_id: {
+  // Social OAuth integration (Google, Facebook, LinkedIn, GitHub)
+  social_id: {
     type: String,
     unique: true,
     sparse: true // allows multiple null values but unique non-null values
   },
   provider: {
     type: String,
-    enum: ['local', 'google'],
+    enum: ['local', 'google', 'facebook', 'linkedin', 'github'],
     default: 'local'
+  },
+  social_profile: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
   },
   role: {
     type: String,
@@ -168,7 +172,6 @@ userSchema.virtual('is_active').get(function() {
   return this.account_status === 'approved';
 });
 
- 
 // Encrypt password using bcrypt
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {

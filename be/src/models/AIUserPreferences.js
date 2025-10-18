@@ -29,11 +29,6 @@ const aiUserPreferencesSchema = new mongoose.Schema({
       max: {
         type: Number,
         min: [0, 'Maximum salary cannot be negative']
-      },
-      currency: {
-        type: String,
-        enum: ['VND', 'USD', 'EUR'],
-        default: 'VND'
       }
     },
     preferred_skills: [{
